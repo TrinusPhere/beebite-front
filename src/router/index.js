@@ -7,8 +7,11 @@ import CadastroCliente from '../views/clientes/CadastroCliente.vue'
 import ListaIngredientes from '../views/ingredientes/ListaIngredientes.vue'
 import CadastroIngrediente from '../views/ingredientes/CadastroIngrediente.vue'
 import ControlePedidos from '../views/pedidos/ControlePedidos.vue'
+import NovoPedido from '../views/pedidos/NovoPedido.vue' // Importar NovoPedido
 import ListaProdutos from '../views/produtos/ListaProdutos.vue'
 import CadastroProduto from '../views/produtos/CadastroProduto.vue'
+import ListaEntregadores from '../views/entregadores/ListaEntregadores.vue'
+import CadastroEntregadores from '../views/entregadores/CadastroEntregador.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -26,6 +29,11 @@ const router = createRouter({
           path: 'pedidos',
           name: 'pedidos',
           component: ControlePedidos
+        },
+        {
+          path: 'pedidos/novo', // Nova rota para Novo Pedido
+          name: 'novo-pedido',
+          component: NovoPedido
         },
         {
           path: 'dashboard',
@@ -76,6 +84,21 @@ const router = createRouter({
           path: 'produtos/editar/:id',
           name: 'editar-produto',
           component: CadastroProduto
+        },
+        {
+          path: 'entregadores',
+          name: 'entregadores',
+          component: ListaEntregadores
+        },
+        {
+          path: 'entregadores/novo',
+          name: 'novo-entregador',
+          component: CadastroEntregadores
+        },
+        {
+          path: 'entregadores/editar/:id',
+          name: 'editar-entregadores',
+          component: CadastroEntregadores
         }
       ]
     }

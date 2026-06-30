@@ -3,16 +3,11 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Search, Edit2, Trash2, Package } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
+import { ingredientsDB } from '@/utils/mockData'
 
 const router = useRouter()
 const searchQuery = ref('')
-const ingredients = ref([
-  { id: 1, name: 'Pão Brioche', stock: 50, unit: 'un', price: 1.50 },
-  { id: 2, name: 'Hambúrguer de Carne 150g', stock: 120, unit: 'un', price: 4.50 },
-  { id: 3, name: 'Queijo Cheddar', stock: 5.5, unit: 'kg', price: 45.00 },
-  { id: 4, name: 'Bacon Fatiado', stock: 2.3, unit: 'kg', price: 38.00 },
-  { id: 5, name: 'Alface Americana', stock: 10, unit: 'un', price: 2.00 },
-])
+const ingredients = ingredientsDB
 
 const filteredIngredients = computed(() => {
   return ingredients.value.filter(item =>

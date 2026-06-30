@@ -3,17 +3,14 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Search, Edit2, Trash2, User, Phone, MapPin } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
+import { clientsDB } from '@/utils/mockData'
 
 const router = useRouter()
 const searchQuery = ref('')
-const clients = ref([
-  { id: 1, name: 'Mateus Silva', phone: '(11) 98888-7777', address: 'Rua das Flores, 123', totalOrders: 15 },
-  { id: 2, name: 'Ana Oliveira', phone: '(11) 97777-6666', address: 'Av. Paulista, 1500', totalOrders: 8 },
-  { id: 3, name: 'Ricardo Santos', phone: '(11) 96666-5555', address: 'Rua Amazonas, 45', totalOrders: 22 },
-])
+const clients = clientsDB.value
 
 const filteredClients = computed(() => {
-  return clients.value.filter(c =>
+  return clients.filter(c =>
     c.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
     c.phone.includes(searchQuery.value)
   )

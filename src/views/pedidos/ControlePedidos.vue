@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   Clock,
   Package,
@@ -13,57 +14,19 @@ import {
   Bike,
   Store,
   Filter,
-  Edit
+  Edit,
+  User // Importar User icon para motoboy
 } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
+import { ordersKanbanDB, motoboysDB } from '@/utils/mockData'
+
+const router = useRouter()
 
 // Filtros ativos
 const activeFilters = ref(['delivery', 'balcao'])
 const openMenuId = ref(null)
 
-const columns = ref([
-  {
-    id: 'preparando',
-    title: 'Sendo Preparado',
-    icon: Clock,
-    color: 'text-orange-500',
-    bg: 'bg-orange-50',
-    orders: [
-      { id: '#1024', customer: 'Mateus Silva', items: '2x X-Bacon, 1x Coca 600ml', time: '12 min', total: 'R$ 65,00', selected: false, type: 'delivery' },
-      { id: '#1025', customer: 'Ana Oliveira', items: '1x X-Salada', time: '5 min', total: 'R$ 28,00', selected: false, type: 'balcao' },
-    ]
-  },
-  {
-    id: 'aguardando',
-    title: 'Aguardando Entrega',
-    icon: Package,
-    color: 'text-blue-500',
-    bg: 'bg-blue-50',
-    orders: [
-      { id: '#1022', customer: 'Ricardo Santos', items: '3x Hot Dog Especial', time: '25 min', total: 'R$ 45,00', selected: false, type: 'delivery' },
-    ]
-  },
-  {
-    id: 'rota',
-    title: 'Em Rota de Entrega',
-    icon: Truck,
-    color: 'text-purple-500',
-    bg: 'bg-purple-50',
-    orders: [
-      { id: '#1020', customer: 'Juliana Lima', items: '1x Combo Família', time: '40 min', total: 'R$ 120,00', driver: 'Carlos', selected: false, type: 'delivery' },
-    ]
-  },
-  {
-    id: 'entregue',
-    title: 'Entregue',
-    icon: CheckCircle2,
-    color: 'text-emerald-500',
-    bg: 'bg-emerald-50',
-    orders: [
-      { id: '#1018', customer: 'Pedro Costa', items: '2x X-Tudo', time: '1h 10min', total: 'R$ 55,00', selected: false, type: 'balcao' },
-    ]
-  }
-])
+const columns = ordersKanbanDB.value
 
 const toggleMenu = (id) => {
   openMenuId.value = openMenuId.value === id ? null : id
@@ -71,14 +34,14 @@ const toggleMenu = (id) => {
 
 const deleteOrder = (id, colIndex) => {
   if (confirm('Tem certeza que deseja excluir este pedido?')) {
-    columns.value[colIndex].orders = columns.value[colIndex].orders.filter(o => o.id !== id)
+    columns[colIndex].orders = columns[colIndex].orders.filter(o => o.id !== id)
     openMenuId.value = null
   }
 }
 
 // Computado para aplicar o filtro nas colunas
 const filteredColumns = computed(() => {
-  return columns.value.map(col => ({
+  return columns.map(col => ({
     ...col,
     orders: col.orders.filter(order => activeFilters.value.includes(order.type))
   }))
@@ -107,30 +70,128 @@ const selectedOrders = computed(() => {
   return selected
 })
 
-const moveSelectedTo = (targetColIndex) => {
-  selectedOrders.value.forEach(item => {
-    const originalColIdx = columns.value.findIndex((_, idx) => idx === item.colIndex)
-    const col = columns.value[originalColIdx]
-    const orderIdx = col.orders.findIndex(o => o.id === item.id)
-    if (orderIdx !== -1) {
-      const [order] = col.orders.splice(orderIdx, 1)
-      order.selected = false
-      columns.value[targetColIndex].orders.unshift(order)
+// --- Nova funcionalidade: Atribuição de Motoboy ---
+const showMotoboyModal = ref(false)
+const motoboys = motoboysDB.value
+const selectedMotoboyId = ref(null)
+const ordersToAssign = ref([]) // Armazena os pedidos que precisam de motoboy atribuído
+
+const openMotoboyModal = (orders) => {
+  ordersToAssign.value = orders
+  selectedMotoboyId.value = null // Resetar seleção
+  showMotoboyModal.value = true
+}
+
+const closeMotoboyModal = () => {
+  showMotoboyModal.value = false
+  ordersToAssign.value = []
+  selectedMotoboyId.value = null
+}
+
+const assignMotoboy = () => {
+  if (!selectedMotoboyId.value) {
+    alert('Por favor, selecione um motoboy.')
+    return
+  }
+  const motoboy = motoboys.find(m => m.id === selectedMotoboyId.value)
+  if (!motoboy) {
+    alert('Motoboy selecionado inválido.')
+    return
+  }
+
+  const rotaColumnIndex = columns.findIndex(col => col.id === 'rota')
+  if (rotaColumnIndex === -1) {
+    console.error("Coluna 'Em Rota de Entrega' não encontrada.")
+    closeMotoboyModal()
+    return
+  }
+
+  ordersToAssign.value.forEach(orderInfo => {
+    // Encontrar o pedido na sua coluna original e removê-lo
+    const originalCol = columns[orderInfo.colIndex]
+    const orderIndex = originalCol.orders.findIndex(o => o.id === orderInfo.id)
+    if (orderIndex !== -1) {
+      const [order] = originalCol.orders.splice(orderIndex, 1)
+      order.selected = false // Desmarcar se fazia parte de uma movimentação em massa
+      order.driver = motoboy.name // Atribuir motoboy
+      columns[rotaColumnIndex].orders.unshift(order) // Adicionar à coluna 'rota'
     }
   })
+
+  closeMotoboyModal()
 }
 
 const moveOrder = (orderId, currentColumnIndex) => {
-  const originalCol = columns.value[currentColumnIndex]
-  const orderIndex = originalCol.orders.findIndex(o => o.id === orderId)
-  if (orderIndex !== -1 && currentColumnIndex < columns.value.length - 1) {
-    const [order] = originalCol.orders.splice(orderIndex, 1)
-    columns.value[currentColumnIndex + 1].orders.unshift(order)
+  const rotaColumnIndex = columns.findIndex(col => col.id === 'rota')
+  if (currentColumnIndex + 1 === rotaColumnIndex) { // Movendo para 'Em Rota de Entrega'
+    const originalCol = columns[currentColumnIndex]
+    const order = originalCol.orders.find(o => o.id === orderId)
+    if (order && order.type === 'delivery') {
+      openMotoboyModal([{ id: order.id, colIndex: currentColumnIndex }])
+    } else if (order && order.type === 'balcao') {
+      // Se for balcão, move diretamente sem motoboy
+      const orderIndex = originalCol.orders.findIndex(o => o.id === orderId)
+      if (orderIndex !== -1) {
+        const [movedOrder] = originalCol.orders.splice(orderIndex, 1)
+        columns[currentColumnIndex + 1].orders.unshift(movedOrder)
+      }
+    }
+  } else if (currentColumnIndex < columns.length - 1) {
+    const originalCol = columns[currentColumnIndex]
+    const orderIndex = originalCol.orders.findIndex(o => o.id === orderId)
+    if (orderIndex !== -1) {
+      const [order] = originalCol.orders.splice(orderIndex, 1)
+      columns[currentColumnIndex + 1].orders.unshift(order)
+    }
+  }
+}
+
+const moveSelectedTo = (targetColIndex) => {
+  const rotaColumnIndex = columns.findIndex(col => col.id === 'rota')
+  if (targetColIndex === rotaColumnIndex) { // Movendo para 'Em Rota de Entrega'
+    const deliveryOrdersToMove = selectedOrders.value.filter(order => order.type === 'delivery')
+    const balcaoOrdersToMove = selectedOrders.value.filter(order => order.type === 'balcao')
+
+    if (deliveryOrdersToMove.length > 0) {
+      openMotoboyModal(deliveryOrdersToMove)
+    } else if (balcaoOrdersToMove.length > 0) {
+      // Mover pedidos de balcão diretamente
+      balcaoOrdersToMove.forEach(item => {
+        const originalColIdx = columns.findIndex((_, idx) => idx === item.colIndex)
+        const col = columns[originalColIdx]
+        const orderIdx = col.orders.findIndex(o => o.id === item.id)
+        if (orderIdx !== -1) {
+          const [order] = col.orders.splice(orderIdx, 1)
+          order.selected = false
+          columns[targetColIndex].orders.unshift(order)
+        }
+      })
+      // Limpar seleção após mover
+      selectedOrders.value.forEach(order => order.selected = false)
+    } else {
+      alert('Nenhum pedido selecionado para mover para "Em Rota de Entrega".')
+    }
+  } else {
+    // Lógica existente para mover para outras colunas
+    selectedOrders.value.forEach(item => {
+      const originalColIdx = columns.findIndex((_, idx) => idx === item.colIndex)
+      const col = columns[originalColIdx]
+      const orderIdx = col.orders.findIndex(o => o.id === item.id)
+      if (orderIdx !== -1) {
+        const [order] = col.orders.splice(orderIdx, 1)
+        order.selected = false
+        columns[targetColIndex].orders.unshift(order)
+      }
+    })
   }
 }
 
 const toggleAllInColumn = (colIndex, value) => {
   filteredColumns.value[colIndex].orders.forEach(o => o.selected = value)
+}
+
+const goToNewOrder = () => {
+  router.push({ name: 'novo-pedido' })
 }
 </script>
 
@@ -159,7 +220,7 @@ const toggleAllInColumn = (colIndex, value) => {
               <Store :size="16" /> Balcão
             </button>
           </div>
-          <BaseButton variant="primary" size="md">Novo Pedido</BaseButton>
+          <BaseButton variant="primary" size="md" @click="goToNewOrder">Novo Pedido</BaseButton>
         </div>
       </div>
 
@@ -234,6 +295,9 @@ const toggleAllInColumn = (colIndex, value) => {
                   <div>
                     <h4 class="font-black text-slate-800 text-sm tracking-tight leading-none mb-2">{{ order.customer }}</h4>
                     <p class="text-xs text-slate-500 font-medium leading-relaxed">{{ order.items }}</p>
+                    <div v-if="order.driver" class="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">
+                      <User :size="14" /> {{ order.driver }}
+                    </div>
                   </div>
 
                   <div class="flex items-center justify-between pt-4 border-t border-slate-50">
@@ -250,6 +314,26 @@ const toggleAllInColumn = (colIndex, value) => {
               </div>
             </div>
           </TransitionGroup>
+        </div>
+      </div>
+    </div>
+
+    <!-- Motoboy Assignment Modal -->
+    <div v-if="showMotoboyModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-3xl shadow-xl w-full max-w-md">
+        <h3 class="text-xl font-bold text-slate-800 mb-4">Atribuir Motoboy</h3>
+        <p class="mb-4 text-slate-600">Selecione o motoboy para {{ ordersToAssign.length > 1 ? 'os pedidos selecionados' : 'o pedido' }}:</p>
+
+        <div class="space-y-3 mb-6">
+          <label v-for="motoboy in motoboys" :key="motoboy.id" class="flex items-center p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
+            <input type="radio" :value="motoboy.id" v-model="selectedMotoboyId" class="form-radio text-orange-600">
+            <span class="ml-3 text-slate-700 font-medium">{{ motoboy.name }}</span>
+          </label>
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <BaseButton variant="secondary" @click="closeMotoboyModal">Cancelar</BaseButton>
+          <BaseButton variant="primary" @click="assignMotoboy">Confirmar</BaseButton>
         </div>
       </div>
     </div>
