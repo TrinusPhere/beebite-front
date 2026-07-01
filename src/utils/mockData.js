@@ -1,6 +1,5 @@
 import { ref } from 'vue'
 
-// --- Dados para Entregadores ---
 export const motoboysDB = ref([
   { id: 1, name: 'Carlos Silva', phone: '(11) 98765-4321', status: 'Ativo', totalDeliveries: 120 },
   { id: 2, name: 'Fernanda Lima', phone: '(11) 91234-5678', status: 'Ativo', totalDeliveries: 95 },
@@ -8,7 +7,6 @@ export const motoboysDB = ref([
   { id: 4, name: 'Mariana Costa', phone: '(11) 95544-3322', status: 'Ativo', totalDeliveries: 150 },
 ])
 
-// --- Dados para Dashboard ---
 export const dashboardStats = ref([
   { name: 'Vendas Hoje', value: 'R$ 1.250,00', change: '+12.5%', icon: 'DollarSign', color: 'text-emerald-600', bg: 'bg-emerald-50' },
   { name: 'Novos Clientes', value: '12', change: '+3.2%', icon: 'Users', color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -22,14 +20,12 @@ export const dashboardRecentOrders = ref([
   { id: '#1022', customer: 'Ricardo Santos', total: 'R$ 45,00', status: 'Em Rota', time: '12:15' },
 ])
 
-// --- Dados para Clientes ---
 export const clientsDB = ref([
   { id: 1, name: 'Mateus Silva', phone: '(11) 98888-7777', address: 'Rua das Flores, 123', totalOrders: 15 },
   { id: 2, name: 'Ana Oliveira', phone: '(11) 97777-6666', address: 'Av. Paulista, 1500', totalOrders: 8 },
   { id: 3, name: 'Ricardo Santos', phone: '(11) 96666-5555', address: 'Rua Amazonas, 45', totalOrders: 22 },
 ])
 
-// --- Dados para Ingredientes ---
 export const ingredientsDB = ref([
   { id: 1, name: 'Pão Brioche', stock: 50, unit: 'un', price: 1.50 },
   { id: 2, name: 'Hambúrguer de Carne 150g', stock: 120, unit: 'un', price: 4.50 },
@@ -38,7 +34,6 @@ export const ingredientsDB = ref([
   { id: 5, name: 'Alface Americana', stock: 10, unit: 'un', price: 2.00 },
 ])
 
-// --- Dados para Produtos ---
 export const productsDB = ref([
   {
     id: 1,
@@ -64,7 +59,6 @@ export const productsDB = ref([
   },
 ])
 
-// --- Dados para Pedidos (ControlePedidos.vue) ---
 export const ordersKanbanDB = ref([
   {
     id: 'preparando',
@@ -109,10 +103,76 @@ export const ordersKanbanDB = ref([
   }
 ])
 
-// --- Produtos para Novo Pedido (fallback/mock inicial) ---
 export const mockAvailableProducts = ref([
   { id: 'prod1', name: 'X-Bacon', description: 'Pão, hambúrguer, queijo, bacon, alface, tomate', price: 25.00 },
   { id: 'prod2', name: 'X-Salada', description: 'Pão, hambúrguer, queijo, alface, tomate', price: 22.00 },
   { id: 'prod3', name: 'Coca-Cola 600ml', description: 'Refrigerante Coca-Cola', price: 8.00 },
   { id: 'prod4', name: 'Batata Frita Grande', description: 'Porção grande de batata frita', price: 15.00 },
+])
+
+export const salesValueDB = ref({
+  daily: { value: 'R$ 1.250,00', change: '+12%', orders: 45 },
+  weekly: { value: 'R$ 8.430,00', change: '+5%', orders: 312 },
+  monthly: { value: 'R$ 35.600,00', change: '+18%', orders: 1250 }
+})
+
+export const salesByProductDB = ref({
+  daily: [
+    { name: 'X-Burger Especial', quantity: 15, value: 'R$ 375,00' },
+    { name: 'Batata Frita G', quantity: 12, value: 'R$ 180,00' },
+    { name: 'Refrigerante Cola 350ml', quantity: 20, value: 'R$ 100,00' }
+  ],
+  weekly: [
+    { name: 'X-Burger Especial', quantity: 105, value: 'R$ 2.625,00' },
+    { name: 'Refrigerante Cola 350ml', quantity: 140, value: 'R$ 700,00' },
+    { name: 'Batata Frita G', quantity: 82, value: 'R$ 1.230,00' }
+  ],
+  monthly: [
+    { name: 'X-Burger Especial', quantity: 450, value: 'R$ 11.250,00' },
+    { name: 'Batata Frita G', quantity: 380, value: 'R$ 5.700,00' },
+    { name: 'Refrigerante Cola 350ml', quantity: 600, value: 'R$ 3.000,00' }
+  ]
+})
+
+export const paymentMethodsDataDB = ref({
+  daily: [
+    { method: 'PIX', quantity: 20, value: 'R$ 550,00', color: 'text-teal-600', bg: 'bg-teal-50' },
+    { method: 'Cartão de Crédito', quantity: 15, value: 'R$ 450,00', color: 'text-blue-600', bg: 'bg-blue-50' },
+    { method: 'Cartão de Débito', quantity: 7, value: 'R$ 150,00', color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { method: 'Dinheiro', quantity: 3, value: 'R$ 100,00', color: 'text-emerald-600', bg: 'bg-emerald-50' }
+  ],
+  weekly: [
+    { method: 'PIX', quantity: 150, value: 'R$ 3.850,00', color: 'text-teal-600', bg: 'bg-teal-50' },
+    { method: 'Cartão de Crédito', quantity: 100, value: 'R$ 2.900,00', color: 'text-blue-600', bg: 'bg-blue-50' },
+    { method: 'Cartão de Débito', quantity: 42, value: 'R$ 1.080,00', color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { method: 'Dinheiro', quantity: 20, value: 'R$ 600,00', color: 'text-emerald-600', bg: 'bg-emerald-50' }
+  ],
+  monthly: [
+    { method: 'PIX', quantity: 600, value: 'R$ 16.000,00', color: 'text-teal-600', bg: 'bg-teal-50' },
+    { method: 'Cartão de Crédito', quantity: 450, value: 'R$ 12.500,00', color: 'text-blue-600', bg: 'bg-blue-50' },
+    { method: 'Cartão de Débito', quantity: 150, value: 'R$ 4.500,00', color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { method: 'Dinheiro', quantity: 50, value: 'R$ 2.600,00', color: 'text-emerald-600', bg: 'bg-emerald-50' }
+  ]
+})
+
+export const deliverySettlementsDB = ref({
+  daily: [
+    { name: 'João Silva', type: 'Fixo', deliveries: 12, allowance: 'R$ 20,00', feePerDelivery: 'R$ 5,00', total: 'R$ 80,00' },
+    { name: 'Carlos Souza', type: 'Diarista', deliveries: 18, allowance: 'R$ 0,00', feePerDelivery: 'R$ 6,00', total: 'R$ 108,00' }
+  ],
+  weekly: [
+    { name: 'João Silva', type: 'Fixo', deliveries: 65, allowance: 'R$ 100,00', feePerDelivery: 'R$ 5,00', total: 'R$ 425,00' },
+    { name: 'Carlos Souza', type: 'Diarista', deliveries: 42, allowance: 'R$ 0,00', feePerDelivery: 'R$ 6,00', total: 'R$ 252,00' }
+  ],
+  monthly: [
+    { name: 'João Silva', type: 'Fixo', deliveries: 250, allowance: 'R$ 400,00', feePerDelivery: 'R$ 5,00', total: 'R$ 1.650,00' },
+    { name: 'Carlos Souza', type: 'Diarista', deliveries: 180, allowance: 'R$ 0,00', feePerDelivery: 'R$ 6,00', total: 'R$ 1.080,00' }
+  ]
+})
+
+// --- Dados para Dashboard (Equipe de Entrega) ---
+export const deliveryTeamDB = ref([
+  { id: 1, name: 'Entregador 1', status: 'Disponível' },
+  { id: 2, name: 'Entregador 2', status: 'Disponível' },
+  { id: 3, name: 'Entregador 3', status: 'Disponível' },
 ])

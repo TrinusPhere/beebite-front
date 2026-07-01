@@ -14,7 +14,12 @@ const form = reactive({
   id: null,
   name: '',
   phone: '',
-  status: 'Ativo' // Default status
+  status: 'Ativo',
+  isFixed: false,
+  isDaily: false,
+  allowance: '',
+  hasFixedDeliveryValue: false,
+  fixedDeliveryValue: ''
 })
 
 onMounted(() => {
@@ -80,7 +85,7 @@ const handleCancel = () => {
     <div class="flex flex-col lg:flex-row gap-8 items-start">
       <!-- Formulário Principal -->
       <div class="flex-1 space-y-6 order-1 lg:order-2">
-        <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+        <form @submit.prevent="handleSubmit" class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
           <div class="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest">
             <Bike :size="16" /> Dados do Entregador
           </div>
@@ -100,6 +105,37 @@ const handleCancel = () => {
                 <option value="Inativo">Inativo</option>
               </select>
             </div>
+            
+            <div class="space-y-1">
+              <label class="text-xs font-bold text-slate-700 ml-1">Ajuda de Custo (R$)</label>
+              <input v-model="form.allowance" type="number" step="0.01" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="0.00">
+            </div>
+
+            <div class="md:col-span-2 space-y-2 mt-2">
+              <label class="text-xs font-bold text-slate-700 ml-1">Tipo de Entregador</label>
+              <div class="flex gap-6">
+                <label class="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                  <input type="checkbox" v-model="form.isFixed" @change="form.isFixed ? form.isDaily = false : null" class="w-4 h-4 text-orange-600 rounded border-slate-300 focus:ring-orange-500 accent-orange-600">
+                  Fixo
+                </label>
+                <label class="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                  <input type="checkbox" v-model="form.isDaily" @change="form.isDaily ? form.isFixed = false : null" class="w-4 h-4 text-orange-600 rounded border-slate-300 focus:ring-orange-500 accent-orange-600">
+                  Diarista
+                </label>
+              </div>
+            </div>
+
+            <div class="md:col-span-2 space-y-2 mt-4 pt-4 border-t border-slate-100">
+              <label class="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
+                <input type="checkbox" v-model="form.hasFixedDeliveryValue" class="w-4 h-4 text-orange-600 rounded border-slate-300 focus:ring-orange-500 accent-orange-600">
+                Valor Fixo por Entrega?
+              </label>
+              
+              <div v-if="form.hasFixedDeliveryValue" class="space-y-1 mt-3 transition-all">
+                <label class="text-xs font-bold text-slate-700 ml-1">Valor da Entrega (R$)</label>
+                <input v-model="form.fixedDeliveryValue" type="number" step="0.01" class="w-full md:w-1/2 bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="0.00">
+              </div>
+            </div>
           </div>
           <!-- Botões -->
           <div class="pt-8 border-t border-slate-100 flex gap-4">
@@ -110,7 +146,7 @@ const handleCancel = () => {
               <X :size="20" /> Cancelar
             </BaseButton>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   </div>

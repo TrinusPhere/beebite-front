@@ -38,6 +38,16 @@
               </div>
             </div>
           </div>
+          
+          <div class="space-y-2 pt-4 border-t border-slate-800">
+            <label class="text-xs text-slate-400 font-bold uppercase tracking-widest">Forma de Pagamento</label>
+            <select v-model="order.paymentMethod" class="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/50 text-white text-sm">
+              <option value="pix">PIX</option>
+              <option value="credito">Cartão de Crédito</option>
+              <option value="debito">Cartão de Débito</option>
+              <option value="dinheiro">Dinheiro</option>
+            </select>
+          </div>
           <div class="pt-4 space-y-3">
             <BaseButton variant="primary" class="w-full" :loading="loading" @click="placeOrder">
               <Save :size="18" /> Finalizar Pedido
@@ -145,7 +155,8 @@ const order = ref({
     name: '',
     address: '' // Apenas para delivery
   },
-  items: [] // { product: {}, quantity: N }
+  items: [], // { product: {}, quantity: N }
+  paymentMethod: 'pix'
 })
 
 const availableProducts = mockAvailableProducts.value // Use mock data directly
@@ -229,6 +240,7 @@ const placeOrder = async () => {
       total: `R$ ${totalOrderPrice.value.toFixed(2)}`,
       selected: false,
       type: order.value.type,
+      paymentMethod: order.value.paymentMethod,
       driver: null
     }
 

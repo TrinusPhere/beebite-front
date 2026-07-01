@@ -9,10 +9,11 @@ import {
   Clock,
   ChevronRight
 } from 'lucide-vue-next'
-import { dashboardStats, dashboardRecentOrders } from '@/utils/mockData'
+import { dashboardStats, dashboardRecentOrders, deliveryTeamDB } from '@/utils/mockData' // Importar deliveryTeamDB
 
 const stats = dashboardStats.value
 const recentOrders = dashboardRecentOrders.value
+const deliveryTeam = deliveryTeamDB.value // Usar os dados do mockData
 </script>
 
 <template>
@@ -85,17 +86,17 @@ const recentOrders = dashboardRecentOrders.value
         </div>
       </div>
 
-      <!-- Entregadores -->
+      <!-- Equipe de Entrega -->
       <div class="bg-white border border-slate-200 rounded-3xl shadow-sm p-6">
         <h3 class="font-black text-slate-800 text-sm uppercase tracking-widest mb-6">Equipe de Entrega</h3>
         <div class="space-y-4">
-          <div v-for="i in 3" :key="i" class="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 transition-all hover:border-orange-100">
+          <div v-for="teamMember in deliveryTeam" :key="teamMember.id" class="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 transition-all hover:border-orange-100">
             <div class="w-10 h-10 bg-gradient-to-tr from-slate-200 to-slate-100 rounded-full flex items-center justify-center text-slate-400">
               <Users :size="20" />
             </div>
             <div class="flex-1">
-              <p class="text-sm font-bold text-slate-800">Entregador {{ i }}</p>
-              <p class="text-[10px] text-emerald-600 font-black uppercase tracking-widest">Disponível</p>
+              <p class="text-sm font-bold text-slate-800">{{ teamMember.name }}</p>
+              <p class="text-[10px] text-emerald-600 font-black uppercase tracking-widest">{{ teamMember.status }}</p>
             </div>
             <div class="w-2 h-2 bg-emerald-500 rounded-full"></div>
           </div>

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { authState } from '../utils/auth' // Importar authState
 import Login from '../views/Login.vue'
 import MainLayout from '../components/MainLayout.vue'
 import Dashboard from '../views/Dashboard.vue'
@@ -7,11 +8,15 @@ import CadastroCliente from '../views/clientes/CadastroCliente.vue'
 import ListaIngredientes from '../views/ingredientes/ListaIngredientes.vue'
 import CadastroIngrediente from '../views/ingredientes/CadastroIngrediente.vue'
 import ControlePedidos from '../views/pedidos/ControlePedidos.vue'
-import NovoPedido from '../views/pedidos/NovoPedido.vue' // Importar NovoPedido
+import NovoPedido from '../views/pedidos/NovoPedido.vue'
 import ListaProdutos from '../views/produtos/ListaProdutos.vue'
 import CadastroProduto from '../views/produtos/CadastroProduto.vue'
 import ListaEntregadores from '../views/entregadores/ListaEntregadores.vue'
 import CadastroEntregadores from '../views/entregadores/CadastroEntregador.vue'
+import AcertoEntregadores from '../views/entregadores/AcertoEntregadores.vue' // Importar o novo componente
+import Financeiro from '../views/financeiro/Financeiro.vue'
+import UsuariosView from '../views/usuarios/Usuarios.vue'
+import CadastroUsuario from "@/views/usuarios/CadastroUsuario.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -24,85 +29,148 @@ const router = createRouter({
     {
       path: '/',
       component: MainLayout,
+      meta: { requiresAuth: true },
       children: [
-        {
-          path: 'pedidos',
-          name: 'pedidos',
-          component: ControlePedidos
-        },
-        {
-          path: 'pedidos/novo', // Nova rota para Novo Pedido
-          name: 'novo-pedido',
-          component: NovoPedido
-        },
         {
           path: 'dashboard',
           name: 'dashboard',
-          component: Dashboard
+          component: Dashboard,
+          meta: { requiresPermission: 'dashboard' }
+        },
+        {
+          path: 'pedidos',
+          name: 'pedidos',
+          component: ControlePedidos,
+          meta: { requiresPermission: 'pedidos' }
+        },
+        {
+          path: 'pedidos/novo',
+          name: 'novo-pedido',
+          component: NovoPedido,
+          meta: { requiresPermission: 'pedidos' }
         },
         {
           path: 'clientes',
           name: 'clientes',
-          component: ListaClientes
+          component: ListaClientes,
+          meta: { requiresPermission: 'clientes' }
         },
         {
           path: 'clientes/novo',
           name: 'novo-cliente',
-          component: CadastroCliente
+          component: CadastroCliente,
+          meta: { requiresPermission: 'clientes' }
         },
         {
           path: 'clientes/editar/:id',
           name: 'editar-cliente',
-          component: CadastroCliente
+          component: CadastroCliente,
+          meta: { requiresPermission: 'clientes' }
         },
         {
           path: 'ingredientes',
           name: 'ingredientes',
-          component: ListaIngredientes
+          component: ListaIngredientes,
+          meta: { requiresPermission: 'ingredientes' }
         },
         {
           path: 'ingredientes/novo',
           name: 'novo-ingrediente',
-          component: CadastroIngrediente
+          component: CadastroIngrediente,
+          meta: { requiresPermission: 'ingredientes' }
         },
         {
           path: 'ingredientes/editar/:id',
           name: 'editar-ingrediente',
-          component: CadastroIngrediente
+          component: CadastroIngrediente,
+          meta: { requiresPermission: 'ingredientes' }
         },
         {
           path: 'produtos',
           name: 'produtos',
-          component: ListaProdutos
+          component: ListaProdutos,
+          meta: { requiresPermission: 'produtos' }
         },
         {
           path: 'produtos/novo',
           name: 'novo-produto',
-          component: CadastroProduto
+          component: CadastroProduto,
+          meta: { requiresPermission: 'produtos' }
         },
         {
           path: 'produtos/editar/:id',
           name: 'editar-produto',
-          component: CadastroProduto
+          component: CadastroProduto,
+          meta: { requiresPermission: 'produtos' }
         },
         {
           path: 'entregadores',
           name: 'entregadores',
-          component: ListaEntregadores
+          component: ListaEntregadores,
+          meta: { requiresPermission: 'entregadores' }
         },
         {
           path: 'entregadores/novo',
           name: 'novo-entregador',
-          component: CadastroEntregadores
+          component: CadastroEntregadores,
+          meta: { requiresPermission: 'entregadores' }
         },
         {
           path: 'entregadores/editar/:id',
           name: 'editar-entregadores',
-          component: CadastroEntregadores
-        }
+          component: CadastroEntregadores,
+          meta: { requiresPermission: 'entregadores' }
+        },
+        {
+          path: 'acerto-entregadores',
+          name: 'acerto-entregadores',
+          component: AcertoEntregadores,
+          meta: { requiresPermission: 'acerto_entregadores' }
+        },
+        {
+          path: 'financeiro',
+          name: 'financeiro',
+          component: Financeiro,
+          meta: { requiresPermission: 'financeiro' }
+        },
+        {
+        path: 'usuarios',
+        name: 'usuarios',
+        component: UsuariosView,
+        meta: { requiresPermission: 'usuarios' }
+        },
+        {
+          path: 'usuarios/novo',
+          name: 'novo-usuario',
+          component: CadastroUsuario,
+          meta: { requiresPermission: 'usuarios' }
+        },
+        {
+          path: 'usuarios/editar/:id',
+          name: 'editar-usuario',
+          component: CadastroUsuario,
+          meta: { requiresPermission: 'usuarios' }
+        },
       ]
     }
   ]
+})
+
+router.beforeEach((to, from, next) => {
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+  const requiredPermission = to.meta.requiresPermission
+
+  console.log('--- Navigation Guard ---');
+  console.log('To:', to.path, 'Requires Auth:', requiresAuth, 'Required Permission:', requiredPermission);
+  console.log('Current User:', authState.currentUser ? authState.currentUser.login : 'None', 'Has Permission:', requiredPermission ? authState.hasPermission(requiredPermission) : 'N/A');
+
+  if (requiresAuth && !authState.currentUser) {
+        next({ name: 'login' })
+  } else if (requiredPermission && !authState.hasPermission(requiredPermission)) {
+    next({ name: 'login' })
+  } else {
+    next()
+  }
 })
 
 export default router

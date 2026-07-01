@@ -10,8 +10,11 @@ import {
   LogOut,
   ChevronLeft,
   X,
-  ClipboardList
+  ClipboardList,
+  DollarSign,
+  Bike
 } from 'lucide-vue-next'
+import { authState } from '../utils/auth'
 
 const emit = defineEmits(['close-mobile'])
 const router = useRouter()
@@ -19,12 +22,15 @@ const route = useRoute()
 const isCollapsed = ref(false)
 
 const menuItems = [
-  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'Pedidos', path: '/pedidos', icon: ClipboardList },
-  { name: 'Clientes', path: '/clientes', icon: Users },
-  { name: 'Ingredientes', path: '/ingredientes', icon: Package },
-  { name: 'Produtos', path: '/produtos', icon: ShoppingBag },
-  { name: 'Entregadores', path: '/entregadores', icon: Truck },
+  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, permission: 'dashboard' },
+  { name: 'Financeiro', path: '/financeiro', icon: DollarSign, permission: 'financeiro' },
+  { name: 'Pedidos', path: '/pedidos', icon: ClipboardList, permission: 'pedidos' },
+  { name: 'Clientes', path: '/clientes', icon: Users, permission: 'clientes' },
+  { name: 'Ingredientes', path: '/ingredientes', icon: Package, permission: 'ingredientes' },
+  { name: 'Produtos', path: '/produtos', icon: ShoppingBag, permission: 'produtos' },
+  { name: 'Entregadores', path: '/entregadores', icon: Truck, permission: 'entregadores' },
+  { name: 'Acerto Entregadores', path: '/acerto-entregadores', icon: Bike, permission: 'acerto_entregadores' },
+   { name: 'Usuários', path: '/usuarios', icon: Users, permission: 'usuarios' },
 ]
 
 const navigate = (path) => {
@@ -33,6 +39,7 @@ const navigate = (path) => {
 }
 
 const handleLogout = () => {
+  authState.logout() // Chamar a função de logout do authState
   router.push('/')
   emit('close-mobile')
 }
@@ -60,22 +67,23 @@ const handleLogout = () => {
 
     <!-- Navigation -->
     <nav class="flex-1 px-4 space-y-1.5 mt-4 overflow-y-auto">
-      <button
-        v-for="item in menuItems"
-        :key="item.path"
-        @click="navigate(item.path)"
-        class="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 group relative"
-        :class="[
-          route.path === item.path
-            ? 'bg-orange-50 text-orange-600 font-bold'
-            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-        ]"
-      >
-        <component :is="item.icon" :size="22" />
-        <span v-if="!isCollapsed" class="text-sm tracking-wide">{{ item.name }}</span>
+      <template v-for="item in menuItems" :key="item.path">
+        <button
+          v-if="authState.hasPermission(item.permission)"
+          @click="navigate(item.path)"
+          :class="[ // Combinando todas as classes aqui
+            'w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 group relative',
+            route.path === item.path
+              ? 'bg-orange-50 text-orange-600 font-bold'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+          ]"
+        >
+          <component :is="item.icon" :size="22" />
+          <span v-if="!isCollapsed" class="text-sm tracking-wide">{{ item.name }}</span>
 
-        <div v-if="route.path === item.path && !isCollapsed" class="absolute left-0 w-1 h-6 bg-orange-500 rounded-r-full"></div>
-      </button>
+          <div v-if="route.path === item.path && !isCollapsed" class="absolute left-0 w-1 h-6 bg-orange-500 rounded-r-full"></div>
+        </button>
+      </template>
     </nav>
 
     <!-- Bottom Actions -->

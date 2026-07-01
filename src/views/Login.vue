@@ -3,6 +3,7 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { LogIn, Lock, User, AlertCircle } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
+import { authState } from '@/utils/auth' // Importar authState
 
 const router = useRouter()
 const loading = ref(false)
@@ -17,11 +18,13 @@ const handleLogin = () => {
   loading.value = true
   errorMessage.value = ''
 
-  // Simulação de autenticação com as credenciais solicitadas
-  setTimeout(() => {
-    if (form.login === 'admin' && form.password === 'admin123') {
+  // Usar a função de login do authState
+  const success = authState.login(form.login, form.password)
+
+  setTimeout(() => { // Mantido o setTimeout para simular um delay de rede
+    if (success) {
       loading.value = false
-      router.push('/pedidos')
+      router.push('/pedidos') // Redirecionar para o dashboard após login bem-sucedido
     } else {
       loading.value = false
       errorMessage.value = 'Usuário ou senha incorretos. Tente novamente.'

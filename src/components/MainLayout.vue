@@ -1,12 +1,24 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router' // Importar useRouter
 import Sidebar from './Sidebar.vue'
-import { Bell, Search, UserCircle, Menu, X } from 'lucide-vue-next'
+import { Bell, Search, UserCircle, Menu, X, LogOut } from 'lucide-vue-next' // Adicionar LogOut icon
+import { authState } from '../utils/auth' // Importar authState
 
+const router = useRouter()
 const isMobileMenuOpen = ref(false)
 
 const toggleMobileMenu = () => {
   isMobileMenuOpen.value = !isMobileMenuOpen.value
+}
+
+// Computed properties para exibir informações do usuário
+const userName = computed(() => authState.currentUser ? authState.currentUser.name : 'Convidado')
+const userRole = computed(() => authState.currentUser ? authState.currentUser.role : 'N/A')
+
+const handleLogout = () => {
+  authState.logout()
+  router.push('/') // Redireciona para a página de login
 }
 </script>
 
@@ -59,12 +71,15 @@ const toggleMobileMenu = () => {
 
           <div class="flex items-center gap-3 pl-4 md:pl-6 border-l border-slate-200">
             <div class="text-right hidden lg:block">
-              <p class="text-xs font-bold text-slate-800">Admin Teste</p>
-              <p class="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Gerente</p>
+              <p class="text-xs font-bold text-slate-800">{{ userName }}</p>
+              <p class="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">{{ userRole }}</p>
             </div>
             <div class="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-tr from-orange-500 to-amber-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md shadow-orange-500/20">
-              AD
+              {{ userName.substring(0, 2).toUpperCase() }}
             </div>
+            <button @click="handleLogout" class="p-2 text-slate-400 hover:text-red-500 transition-colors" title="Sair">
+              <LogOut :size="20" />
+            </button>
           </div>
         </div>
       </header>
