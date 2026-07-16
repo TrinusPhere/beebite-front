@@ -17,6 +17,10 @@ import AcertoEntregadores from '../views/entregadores/AcertoEntregadores.vue' //
 import Financeiro from '../views/financeiro/Financeiro.vue'
 import UsuariosView from '../views/usuarios/Usuarios.vue'
 import CadastroUsuario from "@/views/usuarios/CadastroUsuario.vue";
+import CardapioDigital from '../views/cardapio/CardapioDigital.vue' // Importar o novo componente CardapioDigital
+import Integracoes from '../views/integracoes/Integracoes.vue' // Importar o novo componente Integracoes
+import CMV from '../views/financeiro/CMV.vue' // Importar o novo componente CMV
+import ConfiguracaoModificadores from '../views/configuracoes/ConfiguracaoModificadores.vue' // Módulo de Configuração de Modificadores
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -25,6 +29,12 @@ const router = createRouter({
       path: '/',
       name: 'login',
       component: Login
+    },
+    {
+      path: '/cardapio/:storeName', // Rota pública para o cardápio digital
+      name: 'cardapio-digital',
+      component: CardapioDigital,
+      meta: { public: true } // Marca como rota pública, não requer autenticação
     },
     {
       path: '/',
@@ -134,6 +144,12 @@ const router = createRouter({
           meta: { requiresPermission: 'financeiro' }
         },
         {
+          path: 'financeiro/cmv', // Nova rota para o CMV
+          name: 'cmv',
+          component: CMV,
+          meta: { requiresPermission: 'financeiro' } // Requer permissão de financeiro
+        },
+        {
         path: 'usuarios',
         name: 'usuarios',
         component: UsuariosView,
@@ -151,6 +167,18 @@ const router = createRouter({
           component: CadastroUsuario,
           meta: { requiresPermission: 'usuarios' }
         },
+        {
+          path: 'integracoes',
+          name: 'integracoes',
+          component: Integracoes,
+          meta: { requiresPermission: 'integracoes' }
+        },
+        {
+          path: 'configuracoes/modificadores',
+          name: 'configuracao-modificadores',
+          component: ConfiguracaoModificadores,
+          meta: { requiresPermission: 'produtos' } // Requer permissão de produtos/gestor
+        },
       ]
     }
   ]
@@ -158,17 +186,21 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+  const isPublic = to.matched.some(record => record.meta.public) // Verifica se é uma rota pública
   const requiredPermission = to.meta.requiresPermission
 
   console.log('--- Navigation Guard ---');
-  console.log('To:', to.path, 'Requires Auth:', requiresAuth, 'Required Permission:', requiredPermission);
+  console.log('To:', to.path, 'Requires Auth:', requiresAuth, 'Required Permission:', requiredPermission, 'Is Public:', isPublic);
   console.log('Current User:', authState.currentUser ? authState.currentUser.login : 'None', 'Has Permission:', requiredPermission ? authState.hasPermission(requiredPermission) : 'N/A');
 
   if (requiresAuth && !authState.currentUser) {
         next({ name: 'login' })
   } else if (requiredPermission && !authState.hasPermission(requiredPermission)) {
     next({ name: 'login' })
-  } else {
+  } else if (isPublic) { // Se for rota pública, permite acesso direto
+    next()
+  }
+  else {
     next()
   }
 })

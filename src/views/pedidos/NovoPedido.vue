@@ -38,7 +38,7 @@
               </div>
             </div>
           </div>
-          
+
           <div class="space-y-2 pt-4 border-t border-slate-800">
             <label class="text-xs text-slate-400 font-bold uppercase tracking-widest">Forma de Pagamento</label>
             <select v-model="order.paymentMethod" class="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/50 text-white text-sm">
@@ -95,116 +95,279 @@
           </div>
         </div>
 
-        <!-- Produtos -->
+        <!-- Cardápio de Produtos (agrupado por categoria) -->
         <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
           <h2 class="text-sm font-bold text-slate-700 mb-4 uppercase tracking-widest flex items-center gap-2">
-            <ShoppingBag :size="16" class="text-orange-600" /> Produtos
+            <ShoppingBag :size="16" class="text-orange-600" /> Cardápio
           </h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div v-for="product in availableProducts" :key="product.id" class="border p-4 rounded-xl flex flex-col justify-between shadow-sm hover:shadow-md transition-all">
-              <div>
-                <h3 class="font-bold text-slate-800">{{ product.name }}</h3>
-                <p class="text-sm text-slate-600">{{ product.description }}</p>
-                <p class="text-lg font-semibold text-orange-600 mt-2">R$ {{ product.price.toFixed(2) }}</p>
-              </div>
-              <button @click="addProductToOrder(product)" class="mt-4 bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition-colors">Adicionar</button>
-            </div>
+
+          <!-- Filtro de categorias -->
+          <div class="flex flex-wrap gap-2 mb-5">
+            <button
+              @click="selectedCategory = null"
+              :class="[
+                'px-3 py-1.5 rounded-xl text-xs font-bold transition-all border',
+                selectedCategory === null
+                  ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                  : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-orange-300'
+              ]"
+            >
+              Todos
+            </button>
+            <button
+              v-for="cat in productCategories"
+              :key="cat"
+              @click="selectedCategory = cat"
+              :class="[
+                'px-3 py-1.5 rounded-xl text-xs font-bold transition-all border',
+                selectedCategory === cat
+                  ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                  : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-orange-300'
+              ]"
+            >
+              {{ cat }}
+            </button>
           </div>
-          <p v-if="availableProducts.length === 0" class="text-slate-500 mt-4">Nenhum produto disponível.</p>
+
+          <!-- Grid de produtos -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <button
+              v-for="product in filteredProducts"
+              :key="product.id"
+              @click="openCustomizationModal(product)"
+              class="group relative text-left border-2 border-slate-100 p-0 rounded-2xl flex flex-col overflow-hidden shadow-sm hover:shadow-md hover:border-orange-300 transition-all duration-200 bg-white active:scale-[0.98]"
+            >
+              <!-- Imagem do produto -->
+              <div class="h-28 bg-gradient-to-br from-orange-100 to-amber-100 overflow-hidden">
+                <img
+                  v-if="product.imageUrl"
+                  :src="product.imageUrl"
+                  :alt="product.name"
+                  class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+                <div v-else class="w-full h-full flex items-center justify-center">
+                  <UtensilsCrossed :size="32" class="text-orange-300" />
+                </div>
+              </div>
+
+              <!-- Info do produto -->
+              <div class="p-3 flex flex-col flex-1 gap-1">
+                <h3 class="font-bold text-slate-800 text-sm leading-tight">{{ product.name }}</h3>
+                <p class="text-xs text-slate-500 leading-snug line-clamp-2 flex-1">{{ product.description }}</p>
+                <div class="flex items-center justify-between mt-2">
+                  <span class="text-sm font-black text-orange-600">R$ {{ product.price.toFixed(2) }}</span>
+                  <span class="text-[10px] bg-orange-50 text-orange-500 border border-orange-100 px-1.5 py-0.5 rounded-lg font-bold flex items-center gap-1">
+                    <SlidersHorizontal :size="9" /> Personalizar
+                  </span>
+                </div>
+              </div>
+            </button>
+          </div>
+          <p v-if="filteredProducts.length === 0" class="text-slate-500 mt-4 text-sm text-center py-8">Nenhum produto nesta categoria.</p>
         </div>
 
-        <!-- Itens do Pedido (Lista) -->
+        <!-- Itens do Pedido (carrinho) -->
         <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
           <h2 class="text-sm font-bold text-slate-700 mb-4 uppercase tracking-widest flex items-center gap-2">
             <UtensilsCrossed :size="16" class="text-orange-600" /> Itens Selecionados
+            <span v-if="order.items.length" class="ml-auto bg-orange-500 text-white text-xs font-black w-5 h-5 rounded-full flex items-center justify-center">
+              {{ order.items.length }}
+            </span>
           </h2>
-          <ul class="divide-y divide-slate-200">
-            <li v-for="item in order.items" :key="item.product.id" class="py-3 flex justify-between items-center">
-              <div>
-                <p class="font-medium text-slate-800">{{ item.product.name }}</p>
-                <p class="text-sm text-slate-600">R$ {{ item.product.price.toFixed(2) }} cada</p>
+
+          <TransitionGroup name="cart-list" tag="ul" class="space-y-3">
+            <li
+              v-for="(item, index) in order.items"
+              :key="item.cartItemId"
+              class="bg-slate-50 rounded-2xl p-4 border border-slate-100 flex gap-3 items-start"
+            >
+              <!-- Ícone / mini thumb -->
+              <div class="w-10 h-10 rounded-xl bg-orange-100 shrink-0 overflow-hidden">
+                <img
+                  v-if="item.product.imageUrl"
+                  :src="item.product.imageUrl"
+                  :alt="item.product.name"
+                  class="w-full h-full object-cover"
+                />
               </div>
-              <div class="flex items-center gap-2">
-                <button @click="decreaseQuantity(item.product.id)" class="bg-slate-200 text-slate-700 px-2 py-1 rounded-md hover:bg-slate-300">-</button>
-                <span class="font-bold">{{ item.quantity }}</span>
-                <button @click="increaseQuantity(item.product.id)" class="bg-slate-200 text-slate-700 px-2 py-1 rounded-md hover:bg-slate-300">+</button>
-                <button @click="removeItemFromOrder(item.product.id)" class="text-red-500 hover:text-red-700 ml-2">Remover</button>
+
+              <div class="flex-1 min-w-0">
+                <p class="font-bold text-slate-800 text-sm leading-tight">{{ item.product.name }}</p>
+
+                <!-- Tags de modificadores -->
+                <div class="flex flex-wrap gap-1 mt-1.5">
+                  <span
+                    v-for="mod in item.modifiers"
+                    :key="mod.optionId"
+                    class="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-lg font-bold"
+                  >
+                    {{ mod.optionName }}<span v-if="mod.price > 0"> +R${{ mod.price.toFixed(2) }}</span>
+                  </span>
+                  <span
+                    v-for="rem in item.removals"
+                    :key="rem.id"
+                    class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-lg font-bold"
+                  >
+                    Sem {{ rem.name }}
+                  </span>
+                </div>
+
+                <!-- Observação manual -->
+                <div v-if="editingObsIndex === index" class="mt-2">
+                  <input
+                    type="text"
+                    v-model="item.observation"
+                    placeholder="Ex: Capricha no molho..."
+                    class="w-full text-xs rounded-lg border border-slate-300 px-2 py-1.5 focus:border-orange-400 focus:ring-1 focus:ring-orange-400 outline-none"
+                    @blur="editingObsIndex = null"
+                    @keyup.enter="editingObsIndex = null"
+                    ref="obsInputRef"
+                    autofocus
+                  />
+                </div>
+                <button
+                  v-else-if="item.observation"
+                  @click="editingObsIndex = index"
+                  class="mt-1 text-[10px] text-slate-400 italic hover:text-orange-500 transition-colors"
+                >
+                  💬 {{ item.observation }}
+                </button>
+                <button
+                  v-else
+                  @click="editingObsIndex = index"
+                  class="mt-1 text-[10px] text-slate-400 hover:text-orange-500 transition-colors flex items-center gap-1"
+                >
+                  <MessageSquare :size="10" /> Adicionar observação
+                </button>
+              </div>
+
+              <!-- Preço e controles de qtd -->
+              <div class="flex flex-col items-end gap-2 shrink-0">
+                <span class="font-black text-slate-700 text-sm">R$ {{ (item.totalPrice * item.quantity).toFixed(2) }}</span>
+                <div class="flex items-center gap-1.5">
+                  <button
+                    @click="decreaseQuantity(index)"
+                    class="w-7 h-7 rounded-lg bg-slate-200 text-slate-600 flex items-center justify-center hover:bg-slate-300 font-bold transition-all text-base leading-none"
+                  >−</button>
+                  <span class="font-black text-slate-700 w-5 text-center text-sm">{{ item.quantity }}</span>
+                  <button
+                    @click="increaseQuantity(index)"
+                    class="w-7 h-7 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center hover:bg-orange-200 font-bold transition-all text-base leading-none"
+                  >+</button>
+                  <button
+                    @click="removeItemFromOrder(index)"
+                    class="w-7 h-7 rounded-lg bg-red-100 text-red-500 flex items-center justify-center hover:bg-red-200 transition-all ml-1"
+                  >
+                    <Trash2 :size="13" />
+                  </button>
+                </div>
               </div>
             </li>
-          </ul>
-          <p v-if="order.items.length === 0" class="text-slate-500 mt-4">Nenhum item adicionado ao pedido.</p>
+          </TransitionGroup>
+
+          <div v-if="order.items.length === 0" class="text-center py-10 text-slate-400">
+            <ShoppingBag :size="40" class="mx-auto mb-3 opacity-30" />
+            <p class="text-sm font-medium">Nenhum item adicionado ao pedido.</p>
+            <p class="text-xs mt-1">Selecione produtos no cardápio acima.</p>
+          </div>
         </div>
       </div>
     </div>
+
+    <!-- Modal de Customização -->
+    <ItemCustomizationModal
+      v-model="showCustomizationModal"
+      :product="selectedProductForModal"
+      :all-modifier-groups="allModifierGroups"
+      @confirm="onModalConfirm"
+      @cancel="showCustomizationModal = false"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Save, X, ShoppingBag, User, Package, ChevronLeft, UtensilsCrossed } from 'lucide-vue-next'
+import {
+  Save, X, ShoppingBag, User, Package, ChevronLeft, UtensilsCrossed,
+  SlidersHorizontal, Trash2, MessageSquare
+} from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
-import { mockAvailableProducts, ordersKanbanDB } from '@/utils/mockData' // Import mock data
+import ItemCustomizationModal from '@/components/ItemCustomizationModal.vue'
+import { productsDB, ordersKanbanDB, financialRecordsDB, modifierGroupsDB } from '@/utils/mockData'
 
 const router = useRouter()
-const loading = ref(false) // Para o estado de carregamento do botão de finalizar pedido
+const loading = ref(false)
 
+// ── Estado do pedido ──
 const order = ref({
-  type: 'balcao', // 'delivery' ou 'balcao'
-  customer: {
-    name: '',
-    address: '' // Apenas para delivery
-  },
-  items: [], // { product: {}, quantity: N }
+  type: 'balcao',
+  customer: { name: '', address: '' },
+  items: [],  // cada item é um objeto customizadoItem + { quantity, observation }
   paymentMethod: 'pix'
 })
 
-const availableProducts = mockAvailableProducts.value // Use mock data directly
+// ── Cardápio e filtros ──
+const availableProducts = productsDB.value
+const allModifierGroups = modifierGroupsDB.value
+const selectedCategory = ref(null)
 
-const deliveryCost = computed(() => {
-  // Lógica de cálculo de frete (placeholder)
-  return order.value.type === 'delivery' ? 10.00 : 0.00
+const productCategories = computed(() => {
+  return [...new Set(availableProducts.map(p => p.category))]
 })
 
-const itemsTotalPrice = computed(() => {
-  return order.value.items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0)
+const filteredProducts = computed(() => {
+  if (!selectedCategory.value) return availableProducts
+  return availableProducts.filter(p => p.category === selectedCategory.value)
 })
 
-const totalOrderPrice = computed(() => {
-  return itemsTotalPrice.value + deliveryCost.value
-})
+// ── Modal de customização ──
+const showCustomizationModal = ref(false)
+const selectedProductForModal = ref(null)
 
-const addProductToOrder = (product) => {
-  const existingItem = order.value.items.find(item => item.product.id === product.id)
-  if (existingItem) {
-    existingItem.quantity++
+const openCustomizationModal = (product) => {
+  selectedProductForModal.value = product
+  showCustomizationModal.value = true
+}
+
+// Callback ao confirmar no modal — sempre adiciona como nova linha (independente de customizações)
+const onModalConfirm = (customizedItem) => {
+  order.value.items.push({
+    ...customizedItem,
+    observation: '',
+  })
+}
+
+// ── Observação inline ──
+const editingObsIndex = ref(null)
+
+// ── Controles de quantidade ──
+const increaseQuantity = (index) => {
+  order.value.items[index].quantity++
+}
+
+const decreaseQuantity = (index) => {
+  if (order.value.items[index].quantity > 1) {
+    order.value.items[index].quantity--
   } else {
-    order.value.items.push({ product: product, quantity: 1 })
+    order.value.items.splice(index, 1)
   }
 }
 
-const increaseQuantity = (productId) => {
-  const item = order.value.items.find(item => item.product.id === productId)
-  if (item) {
-    item.quantity++
-  }
+const removeItemFromOrder = (index) => {
+  order.value.items.splice(index, 1)
 }
 
-const decreaseQuantity = (productId) => {
-  const itemIndex = order.value.items.findIndex(item => item.product.id === productId)
-  if (itemIndex !== -1) {
-    if (order.value.items[itemIndex].quantity > 1) {
-      order.value.items[itemIndex].quantity--
-    } else {
-      order.value.items.splice(itemIndex, 1) // Remove if quantity becomes 0
-    }
-  }
-}
+// ── Cálculos de preço ──
+const deliveryCost = computed(() => order.value.type === 'delivery' ? 10.00 : 0.00)
 
-const removeItemFromOrder = (productId) => {
-  order.value.items = order.value.items.filter(item => item.product.id !== productId)
-}
+const itemsTotalPrice = computed(() =>
+  order.value.items.reduce((sum, item) => sum + (item.totalPrice * item.quantity), 0)
+)
 
+const totalOrderPrice = computed(() => itemsTotalPrice.value + deliveryCost.value)
+
+// ── Ações do pedido ──
 const cancelOrder = () => {
   if (confirm('Tem certeza que deseja cancelar este pedido? Todas as informações serão perdidas.')) {
     router.push({ name: 'pedidos' })
@@ -229,14 +392,23 @@ const placeOrder = async () => {
     return
   }
 
-  // Simulate API call with a timeout
   setTimeout(() => {
     const newOrderId = `#${Math.floor(Math.random() * 10000)}`
+
+    // Montar descrição dos itens com modificadores
+    const itemsDescription = order.value.items.map(item => {
+      const mods = item.modifiers.map(m => m.optionName).join(', ')
+      const rems = item.removals.map(r => `Sem ${r.name}`).join(', ')
+      const obs = item.observation ? `[${item.observation}]` : ''
+      const extra = [mods, rems, obs].filter(Boolean).join(' | ')
+      return `${item.quantity}x ${item.product.name}${extra ? ` (${extra})` : ''}`
+    }).join(', ')
+
     const newOrder = {
       id: newOrderId,
       customer: order.value.customer.name,
-      items: order.value.items.map(item => `${item.quantity}x ${item.product.name}`).join(', '),
-      time: 'Agora', // Or calculate based on current time
+      items: itemsDescription,
+      time: 'Agora',
       total: `R$ ${totalOrderPrice.value.toFixed(2)}`,
       selected: false,
       type: order.value.type,
@@ -244,13 +416,35 @@ const placeOrder = async () => {
       driver: null
     }
 
-    // Add the new order to the 'preparando' column in ordersKanbanDB
     const preparingColumn = ordersKanbanDB.value.find(col => col.id === 'preparando')
     if (preparingColumn) {
       preparingColumn.orders.unshift(newOrder)
-    } else {
-      console.error("Coluna 'preparando' não encontrada no mockData.")
     }
+
+    const now = new Date()
+    const date = now.toISOString().split('T')[0]
+    const time = now.toTimeString().split(' ')[0].substring(0, 5)
+
+    const newFinancialRecord = {
+      id: `FIN${Math.floor(Math.random() * 900) + 100}`,
+      orderId: newOrderId,
+      date,
+      time,
+      totalValue: totalOrderPrice.value,
+      paymentMethod: order.value.paymentMethod === 'credito' ? 'Cartão de Crédito' :
+                     order.value.paymentMethod === 'debito' ? 'Cartão de Débito' :
+                     order.value.paymentMethod === 'pix' ? 'PIX' : 'Dinheiro',
+      status: 'Pendente',
+      products: order.value.items.map(item => ({
+        productId: item.product.id,
+        name: item.product.name,
+        quantity: item.quantity,
+        price: item.totalPrice,
+        modifiers: item.modifiers,
+        removals: item.removals,
+      }))
+    }
+    financialRecordsDB.value.push(newFinancialRecord)
 
     alert('Pedido finalizado com sucesso!')
     loading.value = false
@@ -260,5 +454,22 @@ const placeOrder = async () => {
 </script>
 
 <style scoped>
-/* Estilos específicos para NovoPedido.vue */
+/* Animação de entrada/saída dos itens do carrinho */
+.cart-list-enter-active {
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.cart-list-leave-active {
+  transition: all 0.2s ease;
+}
+.cart-list-enter-from {
+  opacity: 0;
+  transform: translateX(-16px) scale(0.96);
+}
+.cart-list-leave-to {
+  opacity: 0;
+  transform: translateX(16px) scale(0.96);
+}
+.cart-list-move {
+  transition: transform 0.3s ease;
+}
 </style>

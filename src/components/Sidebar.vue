@@ -12,7 +12,10 @@ import {
   X,
   ClipboardList,
   DollarSign,
-  Bike
+  Bike,
+  MessageSquare, // Novo ícone para Integrações
+  Calculator, // Novo ícone para CMV
+  Settings   // Ícone para Configurações
 } from 'lucide-vue-next'
 import { authState } from '../utils/auth'
 
@@ -24,13 +27,16 @@ const isCollapsed = ref(false)
 const menuItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, permission: 'dashboard' },
   { name: 'Financeiro', path: '/financeiro', icon: DollarSign, permission: 'financeiro' },
+  { name: 'CMV', path: '/financeiro/cmv', icon: Calculator, permission: 'financeiro' }, // Novo atalho para CMV
   { name: 'Pedidos', path: '/pedidos', icon: ClipboardList, permission: 'pedidos' },
   { name: 'Clientes', path: '/clientes', icon: Users, permission: 'clientes' },
   { name: 'Ingredientes', path: '/ingredientes', icon: Package, permission: 'ingredientes' },
   { name: 'Produtos', path: '/produtos', icon: ShoppingBag, permission: 'produtos' },
   { name: 'Entregadores', path: '/entregadores', icon: Truck, permission: 'entregadores' },
   { name: 'Acerto Entregadores', path: '/acerto-entregadores', icon: Bike, permission: 'acerto_entregadores' },
-   { name: 'Usuários', path: '/usuarios', icon: Users, permission: 'usuarios' },
+  { name: 'Usuários', path: '/usuarios', icon: Users, permission: 'usuarios' },
+  { name: 'Integrações', path: '/integracoes', icon: MessageSquare, permission: 'integracoes' },
+  { name: 'Config. Modificadores', path: '/configuracoes/modificadores', icon: Settings, permission: 'produtos' },
 ]
 
 const navigate = (path) => {

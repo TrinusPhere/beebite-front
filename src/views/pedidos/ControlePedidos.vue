@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Clock,
@@ -15,9 +15,13 @@ import {
   Store,
   Filter,
   Edit,
-  User // Importar User icon para motoboy
+  User,
+  MessageSquare, // Ícone WhatsApp
+  Utensils, // Ícone iFood
+  Loader2 // Para loading
 } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
+import ChatDrawer from '@/components/ChatDrawer.vue' // Importar o ChatDrawer
 import { ordersKanbanDB, motoboysDB } from '@/utils/mockData'
 
 const router = useRouter()
@@ -27,6 +31,34 @@ const activeFilters = ref(['delivery', 'balcao'])
 const openMenuId = ref(null)
 
 const columns = ordersKanbanDB.value
+
+// --- Lógica do Chat Drawer ---
+const showChatDrawer = ref(false)
+const selectedPedidoForChat = ref(null) // Armazena o pedido para o chat
+
+const openChat = (pedido, platform) => {
+  // Para o mock, vamos simular que todos os pedidos têm um chat.
+  // Em um sistema real, você verificaria se o pedido tem um número de WhatsApp ou é do iFood.
+  selectedPedidoForChat.value = {
+    id: pedido.id,
+    customer: pedido.customer,
+    platform: platform,
+    // externalChatId: pedido.whatsappNumber || pedido.ifoodOrderId // Em um sistema real
+  }
+  showChatDrawer.value = true
+}
+
+const closeChat = () => {
+  showChatDrawer.value = false
+  selectedPedidoForChat.value = null
+}
+
+const handleSendMessage = (messageData) => {
+  console.log('Mensagem enviada:', messageData)
+  // Aqui você faria a chamada para o backend para enviar a mensagem
+  // Ex: axios.post('/api/chats/send', messageData)
+  alert(`Mensagem para ${messageData.platform} do pedido ${messageData.pedidoId}: "${messageData.content}" enviada! (Simulado)`)
+}
 
 const toggleMenu = (id) => {
   openMenuId.value = openMenuId.value === id ? null : id
@@ -121,6 +153,152 @@ const assignMotoboy = () => {
   closeMotoboyModal()
 }
 
+// --- Lógica de Drag and Drop e Sincronização iFood ---
+const isDragging = ref(false)
+const draggedOrder = ref(null)
+const draggedFromColumnIndex = ref(null)
+
+const startDrag = (event, order, colIndex) => {
+  isDragging.value = true
+  draggedOrder.value = order
+  draggedFromColumnIndex.value = colIndex
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('text/plain', order.id) // Necessário para Firefox
+}
+
+const onDrop = (event, toColIndex) => {
+  event.preventDefault()
+  isDragging.value = false
+
+  if (!draggedOrder.value || draggedFromColumnIndex.value === null) return
+
+  const fromColIndex = draggedFromColumnIndex.value
+  const order = draggedOrder.value
+
+  // Prevenir mover para a mesma coluna
+  if (fromColIndex === toColIndex) {
+    draggedOrder.value = null
+    draggedFromColumnIndex.value = null
+    return
+  }
+
+  // Remover o pedido da coluna de origem
+  const fromColumn = columns[fromColIndex]
+  fromColumn.orders = fromColumn.orders.filter(o => o.id !== order.id)
+
+  // Adicionar o pedido à nova coluna
+  const toColumn = columns[toColIndex]
+  toColumn.orders.unshift(order) // Adiciona no início da nova coluna
+
+  // Lógica de sincronização iFood
+  if (order.platform === 'ifood' && order.externalOrderId) {
+    updateIfoodStatus(order, fromColumn.id, toColumn.id)
+  }
+
+  draggedOrder.value = null
+  draggedFromColumnIndex.value = null
+}
+
+const allowDrop = (event) => {
+  event.preventDefault()
+}
+
+const updateIfoodStatus = (order, fromColumnId, toColumnId) => {
+  console.log(`Simulando atualização de status iFood para o pedido ${order.id} (externalId: ${order.externalOrderId})`)
+  console.log(`De: ${fromColumnId} Para: ${toColumnId}`)
+
+  // Mapeamento de colunas para status da iFood API (simplificado)
+  const ifoodStatusMap = {
+    'preparando': 'confirm', // ou startPreparation
+    'rota': 'dispatched',
+    'entregue': 'delivered'
+  }
+
+  const targetIfoodStatus = ifoodStatusMap[toColumnId]
+
+  if (!targetIfoodStatus) {
+    console.warn(`Transição de status para ${toColId} não mapeada para iFood API.`)
+    return
+  }
+
+  // Simula a chamada à API do iFood
+  // Em um sistema real, você faria um axios.post para seu backend
+  // que por sua vez chamaria a iFood Merchant API.
+  console.log(`Chamando iFood API para ${order.externalOrderId} com status: ${targetIfoodStatus}`)
+
+  // Exemplo de como seria a chamada real (via backend):
+  // axios.post(`/api/ifood/orders/${order.externalOrderId}/status`, { newStatus: targetIfoodStatus })
+  //   .then(response => {
+  //     console.log('Status iFood atualizado com sucesso:', response.data);
+  //     alert(`Status iFood do pedido ${order.id} atualizado para ${toColId}!`);
+  //   })
+  //   .catch(error => {
+  //     console.error('Erro ao atualizar status iFood:', error);
+  //     alert(`Erro ao atualizar status iFood do pedido ${order.id}.`);
+  //     // Reverter a mudança no frontend se a API falhar
+  //   });
+
+  alert(`Simulação: Status iFood do pedido ${order.id} atualizado para "${toColId}"!`)
+}
+
+// --- Polling de Novos Pedidos iFood ---
+let pollingInterval = null
+const isPolling = ref(false)
+
+const startPollingIfoodOrders = () => {
+  if (isPolling.value) return
+
+  isPolling.value = true
+  console.log('Iniciando polling de pedidos iFood...')
+
+  pollingInterval = setInterval(() => {
+    console.log('Verificando novos pedidos iFood (simulado)...')
+    // Simula uma chamada ao backend para buscar novos pedidos iFood
+    // Em um sistema real, seria um GET /api/ifood/new-orders
+    setTimeout(() => {
+      // Simula a chegada de um novo pedido iFood a cada 15 segundos
+      if (Math.random() < 0.3) { // 30% de chance de um novo pedido
+        const newIfoodOrderId = `IFD-${Math.floor(Math.random() * 100000)}`
+        const newOrder = {
+          id: newIfoodOrderId,
+          customer: `Cliente iFood ${Math.floor(Math.random() * 100)}`,
+          items: '1x X-Burger, 1x Refri',
+          time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          total: `R$ ${(Math.random() * 50 + 20).toFixed(2)}`,
+          selected: false,
+          type: 'delivery',
+          driver: null,
+          platform: 'ifood',
+          externalOrderId: `IFD-EXT-${Math.floor(Math.random() * 1000)}`
+        }
+
+        const preparingColumn = columns.find(col => col.id === 'preparando')
+        if (preparingColumn) {
+          preparingColumn.orders.unshift(newOrder)
+          alert(`Novo pedido iFood recebido: ${newOrder.id}!`)
+        }
+      }
+    }, 1000) // Simula o tempo de resposta do backend
+  }, 15000) // Polling a cada 15 segundos (para demonstração)
+}
+
+const stopPollingIfoodOrders = () => {
+  if (pollingInterval) {
+    clearInterval(pollingInterval)
+    pollingInterval = null
+  }
+  isPolling.value = false
+  console.log('Polling de pedidos iFood parado.')
+}
+
+onMounted(() => {
+  startPollingIfoodOrders()
+})
+
+onUnmounted(() => {
+  stopPollingIfoodOrders()
+})
+
 const moveOrder = (orderId, currentColumnIndex) => {
   const rotaColumnIndex = columns.findIndex(col => col.id === 'rota')
   if (currentColumnIndex + 1 === rotaColumnIndex) { // Movendo para 'Em Rota de Entrega'
@@ -182,7 +360,8 @@ const moveSelectedTo = (targetColIndex) => {
         order.selected = false
         columns[targetColIndex].orders.unshift(order)
       }
-    })
+    }
+    )
   }
 }
 
@@ -258,16 +437,27 @@ const goToNewOrder = () => {
         </div>
 
         <!-- Lista de Pedidos -->
-        <div class="flex-1 space-y-4 bg-slate-100/50 p-2 rounded-[2.5rem] border-2 border-dashed border-slate-200">
+        <div
+          class="flex-1 space-y-4 bg-slate-100/50 p-2 rounded-[2.5rem] border-2 border-dashed border-slate-200"
+          @drop="onDrop($event, colIndex)"
+          @dragover="allowDrop"
+          @dragleave="isDragging = false"
+        >
           <TransitionGroup name="list">
-            <div v-for="order in column.orders" :key="order.id" class="bg-white border p-5 rounded-3xl shadow-sm hover:shadow-md transition-all group relative overflow-visible" :class="order.selected ? 'border-orange-500 ring-4 ring-orange-500/5' : 'border-slate-100'">
-
+            <div
+              v-for="order in column.orders"
+              :key="order.id"
+              class="bg-white border p-5 rounded-3xl shadow-sm hover:shadow-md transition-all group relative overflow-visible"
+              :class="order.selected ? 'border-orange-500 ring-4 ring-orange-500/5' : 'border-slate-100'"
+              draggable="true"
+              @dragstart="startDrag($event, order, colIndex)"
+            >
               <!-- Checkbox -->
               <div class="absolute top-5 left-5 z-10">
                 <input v-model="order.selected" type="checkbox" class="w-5 h-5 rounded-lg border-slate-300 text-orange-600 transition-all cursor-pointer">
               </div>
 
-              <!-- Menu de Configuração (3 pontinhos) -->
+              <!-- Menu de Configurações (3 pontinhos) -->
               <div class="absolute top-4 right-4 z-20">
                 <button @click.stop="toggleMenu(order.id)" class="p-2 text-slate-300 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all">
                   <MoreVertical :size="20" />
@@ -275,7 +465,7 @@ const goToNewOrder = () => {
 
                 <!-- Dropdown Menu -->
                 <transition enter-active-class="transition duration-100 ease-out" enter-from-class="transform scale-95 opacity-0" enter-to-class="transform scale-100 opacity-100" leave-active-class="transition duration-75 ease-in" leave-from-class="transform scale-100 opacity-100" leave-to-class="transform scale-95 opacity-0">
-                  <div v-if="openMenuId === order.id" class="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 py-2">
+                  <div v-if="openMenuId === order.id" class="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 py-2">
                     <button class="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
                       <Edit :size="16" class="text-blue-500" /> Editar Pedido
                     </button>
@@ -337,6 +527,15 @@ const goToNewOrder = () => {
         </div>
       </div>
     </div>
+
+    <!-- Chat Drawer -->
+    <!-- Removido daqui, será global no MainLayout -->
+    <!-- <ChatDrawer
+      :show="showChatDrawer"
+      :pedido="selectedPedidoForChat"
+      @close="closeChat"
+      @send-message="handleSendMessage"
+    /> -->
   </div>
 </template>
 

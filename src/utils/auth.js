@@ -10,7 +10,7 @@ const defaultUsers = [
     login: 'admin',
     password: 'admin123',
     role: 'admin',
-    permissions: ['dashboard', 'financeiro', 'pedidos', 'clientes', 'ingredientes', 'produtos', 'entregadores', 'acerto_entregadores', 'usuarios']
+    permissions: ['dashboard', 'financeiro', 'pedidos', 'clientes', 'ingredientes', 'produtos', 'entregadores', 'acerto_entregadores', 'usuarios', 'integracoes']
   },
   {
     id: 2,
