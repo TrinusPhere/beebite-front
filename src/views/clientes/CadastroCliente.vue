@@ -3,6 +3,7 @@ import { reactive, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Save, X, User, Phone, MapPin, Mail, ChevronLeft, AlertCircle } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
+import { clientsDB } from '@/utils/mockData'
 
 const router = useRouter()
 const route = useRoute()
@@ -10,6 +11,7 @@ const loading = ref(false)
 const isEditing = ref(false)
 
 const form = reactive({
+  id: null,
   name: '',
   phone: '',
   email: '',
@@ -20,18 +22,13 @@ const form = reactive({
   neighborhood: ''
 })
 
-// Simulação de base de dados de clientes
-const clientsDB = [
-  { id: 1, name: 'Mateus Silva', phone: '(11) 98888-7777', email: 'mateus@email.com', address: 'Rua das Flores', number: '123', neighborhood: 'Centro', zipCode: '01234-567' },
-  { id: 2, name: 'Ana Oliveira', phone: '(11) 97777-6666', email: 'ana@email.com', address: 'Av. Paulista', number: '1500', neighborhood: 'Bela Vista', zipCode: '04567-890' },
-]
-
 onMounted(() => {
   if (route.params.id) {
     isEditing.value = true
-    const client = clientsDB.find(c => c.id === parseInt(route.params.id))
+    const clientId = parseInt(route.params.id)
+    const client = clientsDB.value.find(c => c.id === clientId)
     if (client) {
-      Object.assign(form, client)
+      Object.assign(form, JSON.parse(JSON.stringify(client))) // Deep copy para edição
     }
   }
 })
@@ -39,6 +36,17 @@ onMounted(() => {
 const handleSubmit = () => {
   loading.value = true
   setTimeout(() => {
+    if (isEditing.value) {
+      const index = clientsDB.value.findIndex(c => c.id === form.id)
+      if (index !== -1) {
+        clientsDB.value[index] = { ...form } // Atualiza o cliente
+      }
+      alert('Cliente atualizado com sucesso!')
+    } else {
+      const newId = clientsDB.value.length > 0 ? Math.max(...clientsDB.value.map(c => c.id)) + 1 : 1
+      clientsDB.value.push({ ...form, id: newId, totalOrders: 0 }) // Adiciona novo cliente
+      alert('Cliente cadastrado com sucesso!')
+    }
     loading.value = false
     router.push('/clientes')
   }, 1000)

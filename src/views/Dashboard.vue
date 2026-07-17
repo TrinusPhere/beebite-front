@@ -9,19 +9,11 @@ import {
   Clock,
   ChevronRight
 } from 'lucide-vue-next'
+import { dashboardStats, dashboardRecentOrders, deliveryTeamDB } from '@/utils/mockData' // Importar deliveryTeamDB
 
-const stats = [
-  { name: 'Vendas Hoje', value: 'R$ 1.250,00', change: '+12.5%', icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { name: 'Novos Clientes', value: '12', change: '+3.2%', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-  { name: 'Pedidos Ativos', value: '8', change: '-2.1%', icon: ShoppingBag, color: 'text-orange-600', bg: 'bg-orange-50' },
-  { name: 'Ticket Médio', value: 'R$ 42,50', change: '+5.4%', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
-]
-
-const recentOrders = [
-  { id: '#1024', customer: 'Mateus Silva', total: 'R$ 65,00', status: 'Preparando', time: '12:45' },
-  { id: '#1023', customer: 'Ana Oliveira', total: 'R$ 28,00', status: 'Entregue', time: '12:30' },
-  { id: '#1022', customer: 'Ricardo Santos', total: 'R$ 45,00', status: 'Em Rota', time: '12:15' },
-]
+const stats = dashboardStats.value
+const recentOrders = dashboardRecentOrders.value
+const deliveryTeam = deliveryTeamDB.value // Usar os dados do mockData
 </script>
 
 <template>
@@ -45,19 +37,17 @@ const recentOrders = [
         :key="stat.name"
         class="bg-white border border-slate-200 p-6 rounded-3xl hover:border-orange-200 transition-all shadow-sm group"
       >
-        <div class="flex justify-between items-start mb-4">
-          <div :class="['p-3 rounded-2xl transition-colors', stat.bg, stat.color]">
-            <component :is="stat.icon" :size="24" />
-          </div>
-          <span :class="[
-            'flex items-center text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-wider',
-            stat.change.startsWith('+') ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
-          ]">
-            {{ stat.change }}
-            <ArrowUpRight v-if="stat.change.startsWith('+')" :size="12" class="ml-1" />
-            <ArrowDownRight v-else :size="12" class="ml-1" />
-          </span>
+        <div :class="['p-3 rounded-2xl transition-colors', stat.bg, stat.color]">
+          <component :is="stat.icon" :size="24" />
         </div>
+        <span :class="[
+          'flex items-center text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-wider',
+          stat.change.startsWith('+') ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+        ]">
+          {{ stat.change }}
+          <ArrowUpRight v-if="stat.change.startsWith('+')" :size="12" class="ml-1" />
+          <ArrowDownRight v-else :size="12" class="ml-1" />
+        </span>
         <p class="text-slate-400 text-xs font-black uppercase tracking-widest">{{ stat.name }}</p>
         <h3 class="text-2xl font-black text-slate-800 mt-1">{{ stat.value }}</h3>
       </div>
@@ -96,17 +86,17 @@ const recentOrders = [
         </div>
       </div>
 
-      <!-- Entregadores -->
+      <!-- Equipe de Entrega -->
       <div class="bg-white border border-slate-200 rounded-3xl shadow-sm p-6">
         <h3 class="font-black text-slate-800 text-sm uppercase tracking-widest mb-6">Equipe de Entrega</h3>
         <div class="space-y-4">
-          <div v-for="i in 3" :key="i" class="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 transition-all hover:border-orange-100">
+          <div v-for="teamMember in deliveryTeam" :key="teamMember.id" class="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 transition-all hover:border-orange-100">
             <div class="w-10 h-10 bg-gradient-to-tr from-slate-200 to-slate-100 rounded-full flex items-center justify-center text-slate-400">
               <Users :size="20" />
             </div>
             <div class="flex-1">
-              <p class="text-sm font-bold text-slate-800">Entregador {{ i }}</p>
-              <p class="text-[10px] text-emerald-600 font-black uppercase tracking-widest">Disponível</p>
+              <p class="text-sm font-bold text-slate-800">{{ teamMember.name }}</p>
+              <p class="text-[10px] text-emerald-600 font-black uppercase tracking-widest">{{ teamMember.status }}</p>
             </div>
             <div class="w-2 h-2 bg-emerald-500 rounded-full"></div>
           </div>

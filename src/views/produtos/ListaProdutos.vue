@@ -3,14 +3,11 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Search, Edit2, Trash2, ShoppingBag, Layers, BarChart3 } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
+import { productsDB } from '@/utils/mockData'
 
 const router = useRouter()
 const searchQuery = ref('')
-const products = ref([
-  { id: 1, name: 'X-Bacon Especial', category: 'Hambúrgueres', price: 35.00, cost: 12.50, stock: 45 },
-  { id: 2, name: 'Combo Família', category: 'Combos', price: 120.00, cost: 45.00, stock: 10 },
-  { id: 3, name: 'Coca-Cola 600ml', category: 'Bebidas', price: 8.50, cost: 3.20, stock: 150 },
-])
+const products = productsDB
 
 const filteredProducts = computed(() => {
   return products.value.filter(p =>

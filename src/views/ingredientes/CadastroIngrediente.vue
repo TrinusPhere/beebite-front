@@ -3,6 +3,7 @@ import { reactive, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Save, X, Package, DollarSign, Database, ChevronLeft, AlertCircle } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
+import { ingredientsDB } from '@/utils/mockData'
 
 const router = useRouter()
 const route = useRoute()
@@ -10,6 +11,7 @@ const loading = ref(false)
 const isEditing = ref(false)
 
 const form = reactive({
+  id: null,
   name: '',
   stock: '',
   unit: 'un',
@@ -17,40 +19,33 @@ const form = reactive({
   minStock: ''
 })
 
-// Simulação de base de dados para carregar o item ao editar
-const ingredientsDB = [
-  { id: 1, name: 'Pão Brioche', stock: 50, unit: 'un', costPrice: 1.50, minStock: 10 },
-  { id: 2, name: 'Hambúrguer de Carne 150g', stock: 120, unit: 'un', costPrice: 4.50, minStock: 20 },
-  { id: 3, name: 'Queijo Cheddar', stock: 5.5, unit: 'kg', costPrice: 45.00, minStock: 2 },
-  { id: 4, name: 'Bacon Fatiado', stock: 2.3, unit: 'kg', costPrice: 38.00, minStock: 1 },
-]
-
 onMounted(() => {
-  // Verifica se existe um ID na rota (parâmetro dinâmico)
   if (route.params.id) {
     isEditing.value = true
-
-    // Busca o item pelo ID
-    const itemToEdit = ingredientsDB.find(i => i.id === parseInt(route.params.id))
+    const ingredientId = parseInt(route.params.id)
+    const itemToEdit = ingredientsDB.value.find(i => i.id === ingredientId)
 
     if (itemToEdit) {
-      // Preenche o formulário com os dados encontrados
-      form.name = itemToEdit.name
-      form.stock = itemToEdit.stock
-      form.unit = itemToEdit.unit
-      form.costPrice = itemToEdit.costPrice
-      form.minStock = itemToEdit.minStock
+      Object.assign(form, JSON.parse(JSON.stringify(itemToEdit))) // Deep copy para edição
     }
   }
 })
 
 const handleSubmit = () => {
   loading.value = true
-  const msg = isEditing.value ? 'Ingrediente atualizado com sucesso!' : 'Ingrediente cadastrado com sucesso!'
-
   setTimeout(() => {
+    if (isEditing.value) {
+      const index = ingredientsDB.value.findIndex(i => i.id === form.id)
+      if (index !== -1) {
+        ingredientsDB.value[index] = { ...form } // Atualiza o ingrediente
+      }
+      alert('Ingrediente atualizado com sucesso!')
+    } else {
+      const newId = ingredientsDB.value.length > 0 ? Math.max(...ingredientsDB.value.map(i => i.id)) + 1 : 1
+      ingredientsDB.value.push({ ...form, id: newId }) // Adiciona novo ingrediente
+      alert('Ingrediente cadastrado com sucesso!')
+    }
     loading.value = false
-    alert(msg)
     router.push('/ingredientes')
   }, 1000)
 }
