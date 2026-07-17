@@ -1,10 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { authState } from '../utils/auth' // Importar authState
+import { authState } from '../utils/auth'
 import Login from '../views/Login.vue'
-import MainLayout from '../components/MainLayout.vue'
+import AdminLayout from '../layouts/AdminLayout.vue'
 import Dashboard from '../views/Dashboard.vue'
 import ListaClientes from '../views/clientes/ListaClientes.vue'
 import CadastroCliente from '../views/clientes/CadastroCliente.vue'
+import AvaliacaoPedido from '../views/clientes/AvaliacaoPedido.vue'
 import ListaIngredientes from '../views/ingredientes/ListaIngredientes.vue'
 import CadastroIngrediente from '../views/ingredientes/CadastroIngrediente.vue'
 import ControlePedidos from '../views/pedidos/ControlePedidos.vue'
@@ -13,14 +14,17 @@ import ListaProdutos from '../views/produtos/ListaProdutos.vue'
 import CadastroProduto from '../views/produtos/CadastroProduto.vue'
 import ListaEntregadores from '../views/entregadores/ListaEntregadores.vue'
 import CadastroEntregadores from '../views/entregadores/CadastroEntregador.vue'
-import AcertoEntregadores from '../views/entregadores/AcertoEntregadores.vue' // Importar o novo componente
+import AcertoEntregadores from '../views/entregadores/AcertoEntregadores.vue'
 import Financeiro from '../views/financeiro/Financeiro.vue'
 import UsuariosView from '../views/usuarios/Usuarios.vue'
 import CadastroUsuario from "@/views/usuarios/CadastroUsuario.vue";
-import CardapioDigital from '../views/cardapio/CardapioDigital.vue' // Importar o novo componente CardapioDigital
-import Integracoes from '../views/integracoes/Integracoes.vue' // Importar o novo componente Integracoes
-import CMV from '../views/financeiro/CMV.vue' // Importar o novo componente CMV
-import ConfiguracaoModificadores from '../views/configuracoes/ConfiguracaoModificadores.vue' // Módulo de Configuração de Modificadores
+import CardapioDigital from '../views/cardapio/CardapioDigital.vue'
+import Integracoes from '../views/integracoes/Integracoes.vue'
+import CentralMensagens from '../views/integracoes/CentralMensagens.vue'
+import CMV from '../views/financeiro/CMV.vue'
+import ConfiguracaoModificadores from '../views/configuracoes/ConfiguracaoModificadores.vue'
+import Checklist from '../views/operacional/Checklist.vue'
+import Cotacoes from '../views/operacional/Cotacoes.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -31,14 +35,20 @@ const router = createRouter({
       component: Login
     },
     {
-      path: '/cardapio/:storeName', // Rota pública para o cardápio digital
+      path: '/avaliar/:orderId',
+      name: 'avaliar-pedido',
+      component: AvaliacaoPedido,
+      meta: { public: true }
+    },
+    {
+      path: '/cardapio/:storeName',
       name: 'cardapio-digital',
       component: CardapioDigital,
-      meta: { public: true } // Marca como rota pública, não requer autenticação
+      meta: { public: true }
     },
     {
       path: '/',
-      component: MainLayout,
+      component: AdminLayout,
       meta: { requiresAuth: true },
       children: [
         {
@@ -174,11 +184,29 @@ const router = createRouter({
           meta: { requiresPermission: 'integracoes' }
         },
         {
+          path: 'mensagens',
+          name: 'mensagens',
+          component: CentralMensagens,
+          meta: { requiresPermission: 'integracoes' }
+        },
+        {
           path: 'configuracoes/modificadores',
           name: 'configuracao-modificadores',
           component: ConfiguracaoModificadores,
           meta: { requiresPermission: 'produtos' } // Requer permissão de produtos/gestor
         },
+        {
+          path: 'checklist',
+          name: 'checklist',
+          component: Checklist,
+          meta: { requiresPermission: 'pedidos' }
+        },
+        {
+          path: 'cotacoes',
+          name: 'cotacoes',
+          component: Cotacoes,
+          meta: { requiresPermission: 'financeiro' }
+        }
       ]
     }
   ]

@@ -195,6 +195,14 @@ const onDrop = (event, toColIndex) => {
     updateIfoodStatus(order, fromColumn.id, toColumn.id)
   }
 
+  // Lógica de avaliação ao finalizar
+  if (toColumn.id === 'finalizado') {
+    const driverName = order.driver || 'Não aplicável (Balcão)'
+    setTimeout(() => {
+      alert(`Mensagem automática enviada via WhatsApp para o cliente ${order.customer} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`)
+    }, 500)
+  }
+
   draggedOrder.value = null
   draggedFromColumnIndex.value = null
 }
@@ -301,6 +309,8 @@ onUnmounted(() => {
 
 const moveOrder = (orderId, currentColumnIndex) => {
   const rotaColumnIndex = columns.findIndex(col => col.id === 'rota')
+  const finalizadoColumnIndex = columns.findIndex(col => col.id === 'finalizado')
+
   if (currentColumnIndex + 1 === rotaColumnIndex) { // Movendo para 'Em Rota de Entrega'
     const originalCol = columns[currentColumnIndex]
     const order = originalCol.orders.find(o => o.id === orderId)
@@ -319,7 +329,17 @@ const moveOrder = (orderId, currentColumnIndex) => {
     const orderIndex = originalCol.orders.findIndex(o => o.id === orderId)
     if (orderIndex !== -1) {
       const [order] = originalCol.orders.splice(orderIndex, 1)
-      columns[currentColumnIndex + 1].orders.unshift(order)
+      const targetColIndex = currentColumnIndex + 1
+      columns[targetColIndex].orders.unshift(order)
+
+      // Se moveu para finalizado, disparar solicitação de avaliação
+      if (targetColIndex === finalizadoColumnIndex) {
+        const driverName = order.driver || 'Não aplicável (Balcão)'
+        // Simulação do envio de mensagem de avaliação
+        setTimeout(() => {
+          alert(`Mensagem automática enviada via WhatsApp para o cliente ${order.customer} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`)
+        }, 500)
+      }
     }
   }
 }
@@ -447,59 +467,59 @@ const goToNewOrder = () => {
             <div
               v-for="order in column.orders"
               :key="order.id"
-              class="bg-white border p-5 rounded-3xl shadow-sm hover:shadow-md transition-all group relative overflow-visible"
-              :class="order.selected ? 'border-orange-500 ring-4 ring-orange-500/5' : 'border-slate-100'"
+              class="bg-white border p-3 rounded-2xl shadow-sm hover:shadow-md transition-all group relative overflow-visible flex flex-col gap-2"
+              :class="order.selected ? 'border-orange-500 ring-2 ring-orange-500/20' : 'border-slate-200'"
               draggable="true"
               @dragstart="startDrag($event, order, colIndex)"
             >
-              <!-- Checkbox -->
-              <div class="absolute top-5 left-5 z-10">
-                <input v-model="order.selected" type="checkbox" class="w-5 h-5 rounded-lg border-slate-300 text-orange-600 transition-all cursor-pointer">
-              </div>
-
-              <!-- Menu de Configurações (3 pontinhos) -->
-              <div class="absolute top-4 right-4 z-20">
-                <button @click.stop="toggleMenu(order.id)" class="p-2 text-slate-300 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all">
-                  <MoreVertical :size="20" />
-                </button>
-
-                <!-- Dropdown Menu -->
-                <transition enter-active-class="transition duration-100 ease-out" enter-from-class="transform scale-95 opacity-0" enter-to-class="transform scale-100 opacity-100" leave-active-class="transition duration-75 ease-in" leave-from-class="transform scale-100 opacity-100" leave-to-class="transform scale-95 opacity-0">
-                  <div v-if="openMenuId === order.id" class="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 py-2">
-                    <button class="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
-                      <Edit :size="16" class="text-blue-500" /> Editar Pedido
-                    </button>
-                    <button @click="deleteOrder(order.id, colIndex)" class="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">
-                      <Trash2 :size="16" /> Excluir Pedido
-                    </button>
-                  </div>
-                </transition>
-              </div>
-
-              <div class="pl-8 pt-1">
-                <div class="flex justify-between items-start mb-3">
-                  <span class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{{ order.id }}</span>
+              <!-- Top Row: Checkbox, ID, Time, Menu -->
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <input v-model="order.selected" type="checkbox" class="w-4 h-4 rounded border-slate-300 text-orange-600 transition-all cursor-pointer">
+                  <span class="text-xs font-black text-slate-800 tracking-tight">{{ order.id }}</span>
                 </div>
-
-                <div class="space-y-4">
-                  <div>
-                    <h4 class="font-black text-slate-800 text-sm tracking-tight leading-none mb-2">{{ order.customer }}</h4>
-                    <p class="text-xs text-slate-500 font-medium leading-relaxed">{{ order.items }}</p>
-                    <div v-if="order.driver" class="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">
-                      <User :size="14" /> {{ order.driver }}
-                    </div>
+                
+                <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">
+                    <Timer :size="10" /> {{ order.time }}
                   </div>
-
-                  <div class="flex items-center justify-between pt-4 border-t border-slate-50">
-                    <div class="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      <Timer :size="14" /> {{ order.time }}
-                    </div>
-                    <span class="text-sm font-black text-orange-600">R$ {{ order.total.replace('R$ ', '') }}</span>
+                  
+                  <div class="relative">
+                    <button @click.stop="toggleMenu(order.id)" class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all">
+                      <MoreVertical :size="14" />
+                    </button>
+                    <!-- Dropdown Menu -->
+                    <transition enter-active-class="transition duration-100 ease-out" enter-from-class="transform scale-95 opacity-0" enter-to-class="transform scale-100 opacity-100" leave-active-class="transition duration-75 ease-in" leave-from-class="transform scale-100 opacity-100" leave-to-class="transform scale-95 opacity-0">
+                      <div v-if="openMenuId === order.id" class="absolute right-0 top-full mt-1 w-40 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1">
+                        <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                          <Edit :size="14" class="text-blue-500" /> Editar
+                        </button>
+                        <button @click="deleteOrder(order.id, colIndex)" class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">
+                          <Trash2 :size="14" /> Excluir
+                        </button>
+                      </div>
+                    </transition>
                   </div>
                 </div>
+              </div>
 
-                <button v-if="colIndex < columns.length - 1" @click="moveOrder(order.id, colIndex)" class="mt-4 w-full py-3 bg-slate-50 hover:bg-orange-50 text-slate-500 hover:text-orange-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 group/btn border border-slate-100 hover:border-orange-200">
-                  Próxima Etapa <ChevronRight :size="14" />
+              <!-- Customer & Driver -->
+              <div>
+                <h4 class="font-bold text-slate-800 text-xs truncate">{{ order.customer }}</h4>
+                <div v-if="order.driver" class="flex items-center gap-1 text-[10px] font-bold text-blue-600 mt-0.5">
+                  <User :size="10" /> {{ order.driver }}
+                </div>
+              </div>
+
+              <!-- Items (Compact) -->
+              <p class="text-[10px] text-slate-500 font-medium leading-tight line-clamp-2">{{ order.items }}</p>
+
+              <!-- Footer: Total & Action -->
+              <div class="flex items-center justify-between mt-1 pt-2 border-t border-slate-50">
+                <span class="text-xs font-black text-orange-600">R$ {{ order.total.replace('R$ ', '') }}</span>
+                
+                <button v-if="colIndex < columns.length - 1" @click="moveOrder(order.id, colIndex)" class="px-2 py-1 bg-slate-50 hover:bg-orange-50 text-slate-500 hover:text-orange-600 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 border border-slate-200 hover:border-orange-200">
+                  Avançar <ChevronRight :size="12" />
                 </button>
               </div>
             </div>

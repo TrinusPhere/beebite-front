@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router' // Importar useRouter
-import Sidebar from './Sidebar.vue'
-import { Bell, Search, UserCircle, Menu, X, LogOut } from 'lucide-vue-next' // Adicionar LogOut icon
-import { authState } from '../utils/auth' // Importar authState
+import { useRouter } from 'vue-router'
+import Sidebar from '../components/ui/Sidebar.vue'
+import { Bell, Search, UserCircle, Menu, X, LogOut } from 'lucide-vue-next'
+import { authState } from '../utils/auth'
 
 const router = useRouter()
 const isMobileMenuOpen = ref(false)

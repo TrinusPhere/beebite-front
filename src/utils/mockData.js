@@ -11,10 +11,10 @@ export const storeInfo = ref({
 
 // --- Dados para Entregadores ---
 export const motoboysDB = ref([
-  { id: 1, name: 'Carlos Silva', phone: '(11) 98765-4321', status: 'Ativo', totalDeliveries: 120 },
-  { id: 2, name: 'Fernanda Lima', phone: '(11) 91234-5678', status: 'Ativo', totalDeliveries: 95 },
-  { id: 3, name: 'João Pereira', phone: '(11) 99887-6655', status: 'Inativo', totalDeliveries: 50 },
-  { id: 4, name: 'Mariana Costa', phone: '(11) 95544-3322', status: 'Ativo', totalDeliveries: 150 },
+  { id: 1, name: 'Carlos Silva', phone: '(11) 98765-4321', status: 'Ativo', totalDeliveries: 120, rating: 4.8 },
+  { id: 2, name: 'Fernanda Lima', phone: '(11) 91234-5678', status: 'Ativo', totalDeliveries: 95, rating: 4.9 },
+  { id: 3, name: 'João Pereira', phone: '(11) 99887-6655', status: 'Inativo', totalDeliveries: 50, rating: 4.2 },
+  { id: 4, name: 'Mariana Costa', phone: '(11) 95544-3322', status: 'Ativo', totalDeliveries: 150, rating: 5.0 },
 ])
 
 // --- Dados para Dashboard ---
@@ -182,35 +182,54 @@ export const additionalsDB = ref([
 // --- Dados para Pedidos (ControlePedidos.vue) ---
 export const ordersKanbanDB = ref([
   {
-    id: 'preparando',
-    title: 'Sendo Preparado',
-    icon: 'Clock',
-    color: 'text-red-500', // Vermelho
-    bg: 'bg-red-50',      // Vermelho
+    id: 'analise',
+    title: 'Pedido em Análise',
+    icon: 'Search',
+    color: 'text-blue-500', 
+    bg: 'bg-blue-50',      
+    orders: [
+      { id: '#1026', customer: 'João Silva', items: '1x X-Tudo, 1x Suco', time: '2 min', total: 'R$ 45,00', selected: false, type: 'delivery', driver: null, platform: 'own', externalOrderId: null },
+    ]
+  },
+  {
+    id: 'preparo',
+    title: 'Em Preparo',
+    icon: 'ChefHat',
+    color: 'text-yellow-500', 
+    bg: 'bg-yellow-50',      
     orders: [
       { id: '#1024', customer: 'Mateus Silva', items: '2x X-Bacon, 1x Coca 600ml', time: '12 min', total: 'R$ 65,00', selected: false, type: 'delivery', driver: null, platform: 'own', externalOrderId: null },
       { id: '#1025', customer: 'Ana Oliveira', items: '1x X-Salada', time: '5 min', total: 'R$ 28,00', selected: false, type: 'balcao', driver: null, platform: 'own', externalOrderId: null },
       { id: '#IFD001', customer: 'Cliente iFood 1', items: '1x X-Salada, 1x Batata Frita', time: '8 min', total: 'R$ 43,00', selected: false, type: 'delivery', driver: null, platform: 'ifood', externalOrderId: 'IFD-ABC-123' },
     ]
   },
-  // Coluna 'aguardando' removida
   {
-    id: 'rota',
-    title: 'Em Rota de Entrega',
-    icon: 'Truck',
-    color: 'text-blue-500', // Azul
-    bg: 'bg-blue-50',      // Azul
+    id: 'pronto',
+    title: 'Pronto',
+    icon: 'Bell',
+    color: 'text-orange-500', 
+    bg: 'bg-orange-50',      
     orders: [
-      { id: '#1020', customer: 'Juliana Lima', items: '1x Combo Família', time: '40 min', total: 'R$ 120,00', driver: 'Carlos Silva', selected: false, type: 'delivery', platform: 'own', externalOrderId: null },
-      { id: '#1022', customer: 'Ricardo Santos', items: '3x Hot Dog Especial', time: '25 min', total: 'R$ 45,00', selected: false, type: 'delivery', driver: null, platform: 'own', externalOrderId: null },
+      { id: '#1027', customer: 'Maria Souza', items: '1x Hambúrguer', time: '1 min', total: 'R$ 35,00', selected: false, type: 'balcao', driver: null, platform: 'own', externalOrderId: null },
     ]
   },
   {
-    id: 'entregue',
-    title: 'Entregue',
+    id: 'rota',
+    title: 'Saiu para Entrega',
+    icon: 'Truck',
+    color: 'text-purple-500', 
+    bg: 'bg-purple-50',      
+    orders: [
+      { id: '#1020', customer: 'Juliana Lima', items: '1x Combo Família', time: '40 min', total: 'R$ 120,00', driver: 'Carlos Silva', selected: false, type: 'delivery', platform: 'own', externalOrderId: null },
+      { id: '#1022', customer: 'Ricardo Santos', items: '3x Hot Dog Especial', time: '25 min', total: 'R$ 45,00', driver: 'Fernanda Lima', selected: false, type: 'delivery', platform: 'own', externalOrderId: null },
+    ]
+  },
+  {
+    id: 'finalizado',
+    title: 'Finalizado',
     icon: 'CheckCircle2',
-    color: 'text-emerald-500', // Verde
-    bg: 'bg-emerald-50',      // Verde
+    color: 'text-green-500', 
+    bg: 'bg-green-50',      
     orders: [
       { id: '#1018', customer: 'Pedro Costa', items: '2x X-Tudo', time: '1h 10min', total: 'R$ 55,00', selected: false, type: 'balcao', driver: null, platform: 'own', externalOrderId: null },
     ]

@@ -63,6 +63,7 @@ const removeMotoboy = (id) => {
               <th class="px-6 py-4">Nome do Entregador</th>
               <th class="px-6 py-4">Contato</th>
               <th class="px-6 py-4 text-center">Status</th>
+              <th class="px-6 py-4 text-center">Avaliação</th>
               <th class="px-6 py-4 text-center">Entregas</th>
               <th class="px-6 py-4 text-right">Ações</th>
             </tr>
@@ -93,6 +94,12 @@ const removeMotoboy = (id) => {
                   <XCircle :size="12" v-else class="inline-block mr-1" />
                   {{ item.status }}
                 </span>
+              </td>
+              <td class="px-6 py-4 text-center">
+                <div class="flex items-center justify-center gap-1 font-black text-slate-700">
+                  <span class="text-amber-400 text-base">★</span> 
+                  <span>{{ item.rating?.toFixed(1) || 'N/A' }}</span>
+                </div>
               </td>
               <td class="px-6 py-4 text-center">
                 <span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter">
