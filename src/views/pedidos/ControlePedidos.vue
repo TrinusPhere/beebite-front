@@ -2,10 +2,6 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  Clock,
-  Package,
-  Truck,
-  CheckCircle2,
   MoreVertical,
   Timer,
   ChevronRight,
@@ -13,16 +9,23 @@ import {
   Trash2,
   Bike,
   Store,
-  Filter,
   Edit,
   User,
+  FileText, // Ícone NF-e
   MessageSquare, // Ícone WhatsApp
-  Utensils, // Ícone iFood
-  Loader2 // Para loading
+  Utensils, // Ícone
 } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
 import ChatDrawer from '@/components/ChatDrawer.vue' // Importar o ChatDrawer
 import { ordersKanbanDB, motoboysDB } from '@/utils/mockData'
+
+// --- Variáveis para o Novo Botão Flutuante de Abas ---
+const isChatWidgetOpen = ref(false)
+const activeChatWidgetTab = ref('whatsapp') // Aba padrão inicial
+
+const toggleChatWidget = () => {
+  isChatWidgetOpen.value = !isChatWidgetOpen.value
+}
 
 const router = useRouter()
 
@@ -34,23 +37,16 @@ const columns = ordersKanbanDB.value
 
 // --- Lógica do Chat Drawer ---
 const showChatDrawer = ref(false)
-const selectedPedidoForChat = ref(null) // Armazena o pedido para o chat
+const selectedPlatformForChat = ref(null) // Armazena a plataforma para o chat (whatsapp ou ifood)
 
-const openChat = (pedido, platform) => {
-  // Para o mock, vamos simular que todos os pedidos têm um chat.
-  // Em um sistema real, você verificaria se o pedido tem um número de WhatsApp ou é do iFood.
-  selectedPedidoForChat.value = {
-    id: pedido.id,
-    customer: pedido.customer,
-    platform: platform,
-    // externalChatId: pedido.whatsappNumber || pedido.ifoodOrderId // Em um sistema real
-  }
+const openChat = (platform) => {
+  selectedPlatformForChat.value = platform
   showChatDrawer.value = true
 }
 
 const closeChat = () => {
   showChatDrawer.value = false
-  selectedPedidoForChat.value = null
+  selectedPlatformForChat.value = null
 }
 
 const handleSendMessage = (messageData) => {
@@ -392,6 +388,16 @@ const toggleAllInColumn = (colIndex, value) => {
 const goToNewOrder = () => {
   router.push({ name: 'novo-pedido' })
 }
+
+const editOrder = (orderId) => {
+  openMenuId.value = null
+  router.push({ name: 'editar-pedido', params: { id: orderId } })
+}
+
+const emitirNFe = (order) => {
+  openMenuId.value = null
+  alert(`NF-e do pedido ${order.id} emitida com sucesso! (Simulado)`)
+}
 </script>
 
 <template>
@@ -425,9 +431,9 @@ const goToNewOrder = () => {
 
       <!-- Barra de Ações em Massa -->
       <transition
-        enter-active-class="transition duration-300 ease-out"
-        enter-from-class="transform -translate-y-4 opacity-0"
-        enter-to-class="transform translate-y-0 opacity-100"
+          enter-active-class="transition duration-300 ease-out"
+          enter-from-class="transform -translate-y-4 opacity-0"
+          enter-to-class="transform translate-y-0 opacity-100"
       >
         <div v-if="selectedOrders.length > 0" class="bg-slate-900 text-white p-4 rounded-2xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
           <div class="flex items-center gap-3">
@@ -451,48 +457,51 @@ const goToNewOrder = () => {
           <div class="flex items-center gap-2">
             <input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-orange-600" :checked="column.orders.length > 0 && column.orders.every(o => o.selected)" @change="toggleAllInColumn(colIndex, $event.target.checked)">
             <div :class="['p-2 rounded-lg', column.bg, column.color]"><component :is="column.icon" :size="18" /></div>
-            <h3 class="font-black text-slate-800 text-[10px] uppercase tracking-widest">{{ column.title }}</h3>
+            <h3 :class="['font-black text-[10px] uppercase tracking-widest', column.color]">{{ column.title }}</h3>
           </div>
           <span class="bg-white border border-slate-200 text-slate-600 text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">{{ column.orders.length }}</span>
         </div>
 
         <!-- Lista de Pedidos -->
         <div
-          class="flex-1 space-y-4 bg-slate-100/50 p-2 rounded-[2.5rem] border-2 border-dashed border-slate-200"
-          @drop="onDrop($event, colIndex)"
-          @dragover="allowDrop"
-          @dragleave="isDragging = false"
+            class="flex-1 space-y-4 bg-slate-100/50 p-2 rounded-[2.5rem] border-2 border-dashed border-slate-200"
+            @drop="onDrop($event, colIndex)"
+            @dragover="allowDrop"
+            @dragleave="isDragging = false"
         >
           <TransitionGroup name="list">
             <div
-              v-for="order in column.orders"
-              :key="order.id"
-              class="bg-white border p-3 rounded-2xl shadow-sm hover:shadow-md transition-all group relative overflow-visible flex flex-col gap-2"
-              :class="order.selected ? 'border-orange-500 ring-2 ring-orange-500/20' : 'border-slate-200'"
-              draggable="true"
-              @dragstart="startDrag($event, order, colIndex)"
+                v-for="order in column.orders"
+                :key="order.id"
+                class="border p-3 rounded-2xl shadow-sm hover:shadow-md transition-all group relative overflow-visible flex flex-col gap-2"
+                :class="[column.bg, order.selected ? 'ring-2 ring-orange-500/5' : 'border-slate-200']"
+                draggable="true"
+                @dragstart="startDrag($event, order, colIndex)"
             >
               <!-- Top Row: Checkbox, ID, Time, Menu -->
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <input v-model="order.selected" type="checkbox" class="w-4 h-4 rounded border-slate-300 text-orange-600 transition-all cursor-pointer">
-                  <span class="text-xs font-black text-slate-800 tracking-tight">{{ order.id }}</span>
+                  <span :class="['text-xs font-black tracking-tight', column.color]">{{ order.id }}</span>
                 </div>
-                
+
                 <div class="flex items-center gap-2">
                   <div class="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">
                     <Timer :size="10" /> {{ order.time }}
                   </div>
-                  
+
                   <div class="relative">
                     <button @click.stop="toggleMenu(order.id)" class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all">
                       <MoreVertical :size="14" />
                     </button>
                     <!-- Dropdown Menu -->
                     <transition enter-active-class="transition duration-100 ease-out" enter-from-class="transform scale-95 opacity-0" enter-to-class="transform scale-100 opacity-100" leave-active-class="transition duration-75 ease-in" leave-from-class="transform scale-100 opacity-100" leave-to-class="transform scale-95 opacity-0">
-                      <div v-if="openMenuId === order.id" class="absolute right-0 top-full mt-1 w-40 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1">
-                        <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                      <div v-if="openMenuId === order.id" class="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1">
+                        <button @click.stop="editOrder(order.id)" class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
                           <Edit :size="14" class="text-blue-500" /> Editar
+                        </button>
+                        <button @click.stop="emitirNFe(order)" class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                          <FileText :size="14" class="text-emerald-500" /> Emitir NF-e
                         </button>
                         <button @click="deleteOrder(order.id, colIndex)" class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">
                           <Trash2 :size="14" /> Excluir
@@ -517,7 +526,7 @@ const goToNewOrder = () => {
               <!-- Footer: Total & Action -->
               <div class="flex items-center justify-between mt-1 pt-2 border-t border-slate-50">
                 <span class="text-xs font-black text-orange-600">R$ {{ order.total.replace('R$ ', '') }}</span>
-                
+
                 <button v-if="colIndex < columns.length - 1" @click="moveOrder(order.id, colIndex)" class="px-2 py-1 bg-slate-50 hover:bg-orange-50 text-slate-500 hover:text-orange-600 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 border border-slate-200 hover:border-orange-200">
                   Avançar <ChevronRight :size="12" />
                 </button>
@@ -557,9 +566,229 @@ const goToNewOrder = () => {
       @send-message="handleSendMessage"
     /> -->
   </div>
+  <div class="chat-widget-container">
+
+    <!-- Card Flutuante de Abas (Só renderiza se estiver aberto) -->
+    <div v-if="isChatWidgetOpen" class="chat-card">
+      <!-- Cabeçalho -->
+      <div class="chat-card-header">
+        <h3>Canais de Atendimento</h3>
+        <button @click="toggleChatWidget" class="close-btn">&times;</button>
+      </div>
+
+      <!-- Navegação por Abas -->
+      <div class="chat-tabs">
+        <button
+            :class="['tab-btn', { active: activeChatWidgetTab === 'whatsapp' }]"
+            @click="activeChatWidgetTab = 'whatsapp'"
+        >
+          <MessageSquare :size="16" class="inline-icon text-green-500" />
+          WhatsApp
+        </button>
+        <button
+            :class="['tab-btn', { active: activeChatWidgetTab === 'ifood' }]"
+            @click="activeChatWidgetTab = 'ifood'"
+        >
+          <Utensils :size="16" class="inline-icon text-red-500" />
+          iFood
+        </button>
+      </div>
+
+      <!-- Conteúdo Interno das Abas -->
+      <div class="chat-card-content">
+        <!-- Aba WhatsApp -->
+        <div v-if="activeChatWidgetTab === 'whatsapp'" class="tab-content">
+          <p>Deseja iniciar um atendimento direto ou dar suporte ao cliente?</p>
+          <!-- Aqui integra com a sua lógica existente openChat('whatsapp') se necessário, ou link direto -->
+          <button @click="openChat('whatsapp'); toggleChatWidget()" class="action-btn wa-btn">
+            Abrir Chat WhatsApp
+          </button>
+        </div>
+
+        <!-- Aba iFood -->
+        <div v-if="activeChatWidgetTab === 'ifood'" class="tab-content">
+          <p>Gerencie o canal do iFood ou envie mensagens integradas da plataforma.</p>
+          <!-- Integra com a sua lógica existente openChat('ifood') -->
+          <button @click="openChat('ifood'); toggleChatWidget()" class="action-btn ifood-btn">
+            Abrir Chat iFood
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botão Flutuante Fixo (Gatilho) -->
+    <button @click="toggleChatWidget" class="chat-float-trigger" :class="{ 'btn-active': isChatWidgetOpen }">
+      <!-- Exibe o ícone de mensagem padrão ou troca se estiver aberto -->
+      <MessageSquare v-if="!isChatWidgetOpen" :size="28" color="#FFFFFF" />
+      <span v-else class="text-xl font-bold text-white">&times;</span>
+    </button>
+
+  </div>
 </template>
 
 <style scoped>
+/* Container fixado no canto inferior direito */
+.chat-widget-container {
+  position: fixed;
+  bottom: 25px;
+  right: 25px;
+  z-index: 9999;
+  font-family: sans-serif;
+}
+
+/* Botão Redondo Flutuante */
+.chat-float-trigger {
+  width: 60px;
+  height: 60px;
+  background-color: #3b82f6; /* Azul primário (ajuste conforme seu sistema) */
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, background-color 0.2s;
+  float: right;
+}
+
+.chat-float-trigger:hover {
+  transform: scale(1.05);
+}
+
+/* Estado ativo do botão flutuante (opcional: muda para vermelho ao abrir) */
+.chat-float-trigger.btn-active {
+  background-color: #ef4444;
+}
+
+/* Card flutuante de seleção */
+.chat-card {
+  width: 300px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  margin-bottom: 12px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+/* Cabeçalho do Card */
+.chat-card-header {
+  background-color: #1f2937;
+  color: #ffffff;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chat-card-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 20px;
+  cursor: pointer;
+}
+.close-btn:hover {
+  color: #ffffff;
+}
+
+/* Abas */
+.chat-tabs {
+  display: flex;
+  background: #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.tab-btn.active {
+  color: #1f2937;
+  background: #ffffff;
+  border-bottom: 3px solid #3b82f6;
+}
+
+/* Conteúdo */
+.chat-card-content {
+  padding: 16px;
+}
+
+.tab-content p {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+/* Botões de Ação de cada Aba */
+.action-btn {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 6px;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.action-btn:hover {
+  opacity: 0.9;
+}
+
+.wa-btn {
+  background-color: #25D366; /* Verde WhatsApp */
+}
+
+.ifood-btn {
+  background-color: #ea1d2c; /* Vermelho iFood */
+}
+.whatsapp-float {
+  position: fixed;
+  bottom: 20px; /* Distância do fundo da página */
+  right: 20px;  /* Distância da borda direita */
+  z-index: 9999; /* Garante que fica por cima de tudo */
+
+  /* Visual do botão */
+  width: 60px;
+  height: 60px;
+  background-color: #25D366; /* Fundo verde original do WhatsApp */
+  border-radius: 50%;
+  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.3);
+
+  /* Centralização do ícone */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* Efeito de clique e transição */
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+.whatsapp-float:hover {
+  transform: scale(1.1);
+}
 .list-move, .list-enter-active, .list-leave-active { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
 .list-enter-from, .list-leave-to { opacity: 0; transform: translateY(20px) scale(0.95); }
 .list-leave-active { position: absolute; width: 100%; }

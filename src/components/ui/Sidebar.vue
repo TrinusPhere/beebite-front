@@ -35,7 +35,6 @@ const menuItems = [
   { name: 'Entregadores', path: '/entregadores', icon: Truck, permission: 'entregadores' },
   { name: 'Acerto Entregadores', path: '/acerto-entregadores', icon: Bike, permission: 'acerto_entregadores' },
   { name: 'Usuários', path: '/usuarios', icon: Users, permission: 'usuarios' },
-  { name: 'Mensagens', path: '/mensagens', icon: MessageSquare, permission: 'integracoes' },
   { name: 'Integrações', path: '/integracoes', icon: Settings, permission: 'integracoes' },
   { name: 'Config. Modificadores', path: '/configuracoes/modificadores', icon: Settings, permission: 'produtos' },
   { name: 'Checklist Diário', path: '/checklist', icon: ClipboardList, permission: 'pedidos' },

@@ -20,7 +20,6 @@ import UsuariosView from '../views/usuarios/Usuarios.vue'
 import CadastroUsuario from "@/views/usuarios/CadastroUsuario.vue";
 import CardapioDigital from '../views/cardapio/CardapioDigital.vue'
 import Integracoes from '../views/integracoes/Integracoes.vue'
-import CentralMensagens from '../views/integracoes/CentralMensagens.vue'
 import CMV from '../views/financeiro/CMV.vue'
 import ConfiguracaoModificadores from '../views/configuracoes/ConfiguracaoModificadores.vue'
 import Checklist from '../views/operacional/Checklist.vue'
@@ -66,6 +65,12 @@ const router = createRouter({
         {
           path: 'pedidos/novo',
           name: 'novo-pedido',
+          component: NovoPedido,
+          meta: { requiresPermission: 'pedidos' }
+        },
+        {
+          path: 'pedidos/editar/:id',
+          name: 'editar-pedido',
           component: NovoPedido,
           meta: { requiresPermission: 'pedidos' }
         },
@@ -160,10 +165,10 @@ const router = createRouter({
           meta: { requiresPermission: 'financeiro' } // Requer permissão de financeiro
         },
         {
-        path: 'usuarios',
-        name: 'usuarios',
-        component: UsuariosView,
-        meta: { requiresPermission: 'usuarios' }
+          path: 'usuarios',
+          name: 'usuarios',
+          component: UsuariosView,
+          meta: { requiresPermission: 'usuarios' }
         },
         {
           path: 'usuarios/novo',
@@ -181,12 +186,6 @@ const router = createRouter({
           path: 'integracoes',
           name: 'integracoes',
           component: Integracoes,
-          meta: { requiresPermission: 'integracoes' }
-        },
-        {
-          path: 'mensagens',
-          name: 'mensagens',
-          component: CentralMensagens,
           meta: { requiresPermission: 'integracoes' }
         },
         {
@@ -222,7 +221,7 @@ router.beforeEach((to, from, next) => {
   console.log('Current User:', authState.currentUser ? authState.currentUser.login : 'None', 'Has Permission:', requiredPermission ? authState.hasPermission(requiredPermission) : 'N/A');
 
   if (requiresAuth && !authState.currentUser) {
-        next({ name: 'login' })
+    next({ name: 'login' })
   } else if (requiredPermission && !authState.hasPermission(requiredPermission)) {
     next({ name: 'login' })
   } else if (isPublic) { // Se for rota pública, permite acesso direto
