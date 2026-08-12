@@ -6,9 +6,13 @@
         <button @click="router.push('/pedidos')" class="p-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-500 transition-colors">
           <ChevronLeft :size="20" />
         </button>
-        <div>
-          <h1 class="text-xl font-black text-slate-800 tracking-tight leading-none">Novo Pedido</h1>
-          <p class="text-slate-500 text-xs font-medium mt-1">Selecione os produtos e adicione ao carrinho</p>
+      <div>
+          <h1 class="text-xl font-black text-slate-800 tracking-tight leading-none">
+            {{ isEditMode ? 'Editar Pedido' : 'Novo Pedido' }}
+          </h1>
+          <p class="text-slate-500 text-xs font-medium mt-1">
+            {{ isEditMode ? `Editando pedido ${editOrderId}` : 'Selecione os produtos e adicione ao carrinho' }}
+          </p>
         </div>
       </div>
       
@@ -101,7 +105,7 @@
 
       <!-- Resumo do Pedido (Sidebar Fixa à direita) -->
       <OrderSummarySidebar 
-        :order="order"
+        :order="sidebarOrder"
         :itemsTotalPrice="itemsTotalPrice"
         :deliveryCost="deliveryCost"
         :totalOrderPrice="totalOrderPrice"
@@ -124,7 +128,7 @@
 
     <OrderConfirmationModal 
       v-model="showConfirmationModal"
-      :order="order"
+      :order="sidebarOrder"
       :totalOrderPrice="totalOrderPrice"
       @confirm="placeOrder"
     />
@@ -132,8 +136,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ChevronLeft, User, PackageX } from 'lucide-vue-next'
 import PosProductCard from '@/components/domain/PosProductCard.vue'
 import OrderSummarySidebar from '@/components/domain/OrderSummarySidebar.vue'
@@ -142,7 +146,18 @@ import ItemCustomizationModal from '@/components/ItemCustomizationModal.vue'
 import { productsDB, ordersKanbanDB, financialRecordsDB, modifierGroupsDB } from '@/utils/mockData'
 
 const router = useRouter()
+const route = useRoute()
 const loading = ref(false)
+
+// ── Modo edição ──
+const isEditMode = computed(() => !!route.params.id)
+const editOrderId = computed(() => route.params.id || null)
+
+// Referência ao pedido original (para atualizar)
+let originalOrderRef = null
+let originalColRef = null
+const originalTotal = ref(0)          // total do pedido original em modo edição
+const originalItemsText = ref('')     // descrição dos itens originais
 
 // ── Estado do pedido ──
 const order = ref({
@@ -150,6 +165,55 @@ const order = ref({
   customer: { name: '', address: '' },
   items: [],
   paymentMethod: 'pix'
+})
+
+// ── Carregar dados se estiver em modo edição ──
+onMounted(() => {
+  if (isEditMode.value) {
+    for (const col of ordersKanbanDB.value) {
+      const found = col.orders.find(o => o.id === editOrderId.value)
+      if (found) {
+        originalOrderRef = found
+        originalColRef = col
+        // Pre-preencher o formulário com os dados do pedido existente
+        order.value.type = found.type || 'balcao'
+        order.value.paymentMethod = found.paymentMethod || 'pix'
+        order.value.customer.name = found.customer || ''
+        order.value.customer.address = found.address || ''
+        // Guardar total e itens originais (armazenados como string no mock)
+        const totalStr = (found.total || 'R$ 0').replace('R$ ', '').replace(',', '.')
+        originalTotal.value = parseFloat(totalStr) || 0
+        originalItemsText.value = found.items || ''
+        break
+      }
+    }
+  }
+})
+
+// ── Order para o Sidebar: em modo edição, sempre inclui os itens originais como primeiro item virtual ──
+const originalSubtotal = computed(() => {
+  if (!isEditMode.value || originalTotal.value === 0) return 0
+  // subtotal original = total original menos taxa de entrega (se o tipo original era delivery)
+  const origDelivery = originalOrderRef?.type === 'delivery' ? 10 : 0
+  return Math.max(0, originalTotal.value - origDelivery)
+})
+
+const sidebarOrder = computed(() => {
+  if (isEditMode.value && originalItemsText.value) {
+    const virtualItem = {
+      product: { name: originalItemsText.value },
+      quantity: 1,
+      totalPrice: originalSubtotal.value,
+      modifiers: [],
+      removals: [],
+      observation: ''
+    }
+    return {
+      ...order.value,
+      items: [virtualItem, ...order.value.items]
+    }
+  }
+  return order.value
 })
 
 // ── Cardápio e filtros ──
@@ -183,15 +247,26 @@ const onModalConfirm = (customizedItem) => {
 }
 
 const removeItemFromOrder = (index) => {
-  order.value.items.splice(index, 1)
+  if (isEditMode.value && originalItemsText.value) {
+    // O índice 0 é o item virtual dos itens originais — não pode ser removido aqui
+    if (index === 0) return
+    order.value.items.splice(index - 1, 1)
+  } else {
+    order.value.items.splice(index, 1)
+  }
 }
 
 // ── Cálculos de preço ──
 const deliveryCost = computed(() => order.value.type === 'delivery' ? 10.00 : 0.00)
 
-const itemsTotalPrice = computed(() =>
-  order.value.items.reduce((sum, item) => sum + (item.totalPrice * item.quantity), 0)
-)
+const itemsTotalPrice = computed(() => {
+  const newItemsTotal = order.value.items.reduce((sum, item) => sum + (item.totalPrice * item.quantity), 0)
+  // Em modo edição, soma o subtotal original com os novos itens adicionados
+  if (isEditMode.value && originalSubtotal.value > 0) {
+    return originalSubtotal.value + newItemsTotal
+  }
+  return newItemsTotal
+})
 
 const totalOrderPrice = computed(() => itemsTotalPrice.value + deliveryCost.value)
 
@@ -209,7 +284,8 @@ const requestOrderConfirmation = () => {
     alert('Por favor, informe o endereço de entrega.')
     return
   }
-  if (order.value.items.length === 0) {
+  // Em modo edição, permite salvar mesmo sem adicionar novos itens (mantém os originais)
+  if (!isEditMode.value && order.value.items.length === 0) {
     alert('Adicione pelo menos um item ao pedido.')
     return
   }
@@ -221,8 +297,6 @@ const placeOrder = async () => {
   showConfirmationModal.value = false
   
   setTimeout(() => {
-    const newOrderId = `#${Math.floor(Math.random() * 10000)}`
-
     const itemsDescription = order.value.items.map(item => {
       const mods = item.modifiers.map(m => m.optionName).join(', ')
       const rems = item.removals.map(r => `Sem ${r.name}`).join(', ')
@@ -231,21 +305,35 @@ const placeOrder = async () => {
       return `${item.quantity}x ${item.product.name}${extra ? ` (${extra})` : ''}`
     }).join(', ')
 
-    const newOrder = {
-      id: newOrderId,
-      customer: order.value.customer.name || 'Cliente Padrão',
-      items: itemsDescription,
-      time: 'Agora',
-      total: `R$ ${totalOrderPrice.value.toFixed(2)}`,
-      selected: false,
-      type: order.value.type,
-      paymentMethod: order.value.paymentMethod,
-      driver: null
-    }
+    if (isEditMode.value && originalOrderRef) {
+      // Atualizar o pedido existente
+      originalOrderRef.customer = order.value.customer.name || originalOrderRef.customer
+      originalOrderRef.address = order.value.customer.address || ''
+      originalOrderRef.type = order.value.type
+      originalOrderRef.paymentMethod = order.value.paymentMethod
+      if (order.value.items.length > 0) {
+        originalOrderRef.items = itemsDescription
+        originalOrderRef.total = `R$ ${totalOrderPrice.value.toFixed(2)}`
+      }
+    } else {
+      // Criar novo pedido
+      const newOrderId = `#${Math.floor(Math.random() * 10000)}`
+      const newOrder = {
+        id: newOrderId,
+        customer: order.value.customer.name || 'Cliente Padrão',
+        items: itemsDescription,
+        time: 'Agora',
+        total: `R$ ${totalOrderPrice.value.toFixed(2)}`,
+        selected: false,
+        type: order.value.type,
+        paymentMethod: order.value.paymentMethod,
+        driver: null
+      }
 
-    const initialColumn = ordersKanbanDB.value.find(col => col.id === 'analise')
-    if (initialColumn) {
-      initialColumn.orders.unshift(newOrder)
+      const initialColumn = ordersKanbanDB.value.find(col => col.id === 'analise')
+      if (initialColumn) {
+        initialColumn.orders.unshift(newOrder)
+      }
     }
 
     loading.value = false

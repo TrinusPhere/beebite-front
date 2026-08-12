@@ -204,16 +204,6 @@ export const ordersKanbanDB = ref([
     ]
   },
   {
-    id: 'pronto',
-    title: 'Pronto',
-    icon: 'Bell',
-    color: 'text-orange-500', 
-    bg: 'bg-orange-50',      
-    orders: [
-      { id: '#1027', customer: 'Maria Souza', items: '1x Hambúrguer', time: '1 min', total: 'R$ 35,00', selected: false, type: 'balcao', driver: null, platform: 'own', externalOrderId: null },
-    ]
-  },
-  {
     id: 'rota',
     title: 'Saiu para Entrega',
     icon: 'Truck',
