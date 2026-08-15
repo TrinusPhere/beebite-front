@@ -14,22 +14,24 @@ const form = reactive({
   password: ''
 })
 
-const handleLogin = () => {
+const handleLogin = async () => {
   loading.value = true
   errorMessage.value = ''
 
-  // Usar a função de login do authState
-  const success = authState.login(form.login, form.password)
-
-  setTimeout(() => { // Mantido o setTimeout para simular um delay de rede
+  try {
+    const success = await authState.login(form.login, form.password)
     if (success) {
-      loading.value = false
       router.push('/pedidos') // Redirecionar para o dashboard após login bem-sucedido
-    } else {
-      loading.value = false
-      errorMessage.value = 'Usuário ou senha incorretos. Tente novamente.'
     }
-  }, 1000)
+  } catch (error) {
+    if (error.response && error.response.status === 401) {
+      errorMessage.value = 'Usuário ou senha incorretos. Tente novamente.'
+    } else {
+      errorMessage.value = 'Erro ao conectar com o servidor. Tente novamente mais tarde.'
+    }
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

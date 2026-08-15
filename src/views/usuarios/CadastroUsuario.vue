@@ -1,9 +1,9 @@
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { authState } from '../../utils/auth'
 import { UserPlus, Edit, Save, XCircle, KeyRound, Lock, User, CheckSquare, ArrowLeft } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
+import { userService } from '@/services/userService'
 
 const router = useRouter()
 const route = useRoute()
@@ -32,7 +32,6 @@ const allPermissions = [
 
 const selectAll = ref(false)
 
-// Watcher para selecionar/desselecionar todas as permissões
 const toggleSelectAll = () => {
   if (selectAll.value) {
     currentUserForm.permissions = [...allPermissions]
@@ -41,42 +40,53 @@ const toggleSelectAll = () => {
   }
 }
 
-// Computed property para verificar se todas as permissões estão selecionadas
 const areAllPermissionsSelected = computed(() => {
   return allPermissions.every(perm => currentUserForm.permissions.includes(perm))
 })
 
-// Watcher para atualizar o checkbox "Selecionar Todos"
 const updateSelectAllCheckbox = () => {
   selectAll.value = areAllPermissionsSelected.value
 }
 
-// Observar mudanças nas permissões para atualizar o checkbox "Selecionar Todos"
 onMounted(() => {
   updateSelectAllCheckbox()
 })
 
-onMounted(() => {
+onMounted(async () => {
   if (route.params.id) {
     isEditing.value = true
-    const userToEdit = authState.users.find(u => u.id == route.params.id)
-    if (userToEdit) {
-      Object.assign(currentUserForm, { ...userToEdit })
-      updateSelectAllCheckbox() // Atualiza o estado do "Selecionar Todos" ao carregar o usuário
-    } else {
-      // Usuário não encontrado, redireciona para a lista
+    try {
+      const userToEdit = await userService.getById(route.params.id)
+      if (userToEdit) {
+        Object.assign(currentUserForm, { ...userToEdit })
+        currentUserForm.password = '' // Limpar a senha ao editar
+        updateSelectAllCheckbox()
+      }
+    } catch (error) {
+      console.error("Erro ao carregar usuário", error)
       router.push('/usuarios')
     }
   }
 })
 
-const saveUser = () => {
-  if (isEditing.value) {
-    authState.updateUser(currentUserForm)
-  } else {
-    authState.addUser(currentUserForm)
+const saveUser = async () => {
+  try {
+    const dataToSave = { ...currentUserForm }
+    // Se estiver editando e a senha estiver vazia, não envie a senha
+    if (isEditing.value && !dataToSave.password) {
+      delete dataToSave.password
+    }
+    
+    if (isEditing.value) {
+      await userService.update(currentUserForm.id, dataToSave)
+    } else {
+      await userService.create(dataToSave)
+    }
+    router.push('/usuarios')
+  } catch (error) {
+    console.error("Erro ao salvar usuário", error)
+    alert("Erro ao salvar o usuário.")
   }
-  router.push('/usuarios') // Redireciona de volta para a lista de usuários
 }
 
 const cancel = () => {

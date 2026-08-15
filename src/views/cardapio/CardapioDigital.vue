@@ -1,12 +1,25 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { ShoppingCart, X, MapPin, Bike, Store, CreditCard, Banknote, QrCode, Clock, ChevronRight, ChevronLeft, Plus, Minus, Trash2, User, Clipboard } from 'lucide-vue-next'
-import { productsDB, storeInfo, ordersKanbanDB, financialRecordsDB } from '@/utils/mockData'
+import { ShoppingCart, X, MapPin, Bike, Store as StoreIcon, CreditCard, Banknote, QrCode, Clock, ChevronRight, ChevronLeft, Plus, Minus, Trash2, User, Clipboard } from 'lucide-vue-next'
+import { productsDB, ordersKanbanDB, financialRecordsDB } from '@/utils/mockData'
+import { storeService } from '@/services/storeService'
 
 // --- Dados da Loja ---
-const loja = storeInfo.value
-const estaAberto = computed(() => loja.isOpen)
+const loja = ref({ name: 'Carregando...', openingHours: 'Seg-Dom 18h as 23h', isOpen: true, logoUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80' })
+const estaAberto = computed(() => loja.value.isOpen)
+
+onMounted(async () => {
+  try {
+    const data = await storeService.getStore()
+    if (data) {
+      loja.value.name = data.name
+      // O documento real pode ser usado onde for conveniente
+    }
+  } catch (error) {
+    console.error("Erro ao buscar informações da loja", error)
+  }
+})
 
 // --- Produtos ---
 const produtos = productsDB.value
@@ -362,7 +375,7 @@ const scrollCategorias = (direction) => {
                 </label>
                 <label :class="['flex-1 p-3 rounded-lg border cursor-pointer flex items-center gap-2', formCheckout.tipoEntrega === 'retirada' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 bg-white']">
                   <input type="radio" value="retirada" v-model="formCheckout.tipoEntrega" class="form-radio text-orange-500">
-                  <Store :size="20" /> Retirada
+                  <StoreIcon :size="20" /> Retirada
                 </label>
               </div>
             </div>

@@ -1,12 +1,24 @@
 <script setup>
-import { computed } from 'vue'
-import { useRouter } from 'vue-router' // Importar useRouter
-import { authState } from '../../utils/auth'
-import { UserPlus, Edit, Trash2, Users } from 'lucide-vue-next' // Remover Save, XCircle, KeyRound, Lock, User, CheckSquare
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { UserPlus, Edit, Trash2, Users } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
+import { userService } from '@/services/userService'
 
 const router = useRouter()
-const users = computed(() => authState.users)
+const users = ref([])
+
+const fetchUsers = async () => {
+  try {
+    users.value = await userService.getAll()
+  } catch (error) {
+    console.error("Erro ao buscar usuários", error)
+  }
+}
+
+onMounted(() => {
+  fetchUsers()
+})
 
 const goToAddUser = () => {
   router.push('/usuarios/novo')
@@ -16,9 +28,15 @@ const goToEditUser = (user) => {
   router.push(`/usuarios/editar/${user.id}`)
 }
 
-const deleteUser = (userId) => {
+const deleteUser = async (userId) => {
   if (confirm('Tem certeza que deseja excluir este usuário?')) {
-    authState.deleteUser(userId)
+    try {
+      await userService.delete(userId)
+      await fetchUsers() // Atualiza a lista
+    } catch (error) {
+      console.error("Erro ao excluir usuário", error)
+      alert("Erro ao excluir usuário.")
+    }
   }
 }
 </script>
