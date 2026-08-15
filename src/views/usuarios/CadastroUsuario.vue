@@ -149,9 +149,9 @@ const cancel = () => {
               class="w-full bg-slate-50 border border-slate-200 text-slate-900 pl-4 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
             >
               <option value="" disabled>Selecione um cargo</option>
-              <option value="admin">Administrador</option>
-              <option value="gerente">Gerente</option>
-              <option value="caixa">Caixa</option>
+              <option value="ADMIN">Administrador</option>
+              <option value="GERENTE">Gerente</option>
+              <option value="CAIXA">Caixa</option>
             </select>
           </div>
         </div>
