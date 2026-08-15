@@ -1,13 +1,21 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Search, Edit2, Trash2, ShoppingBag, Layers, BarChart3 } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
-import { productsDB } from '@/utils/mockData'
+import { productService } from '@/services/productService'
 
 const router = useRouter()
 const searchQuery = ref('')
-const products = productsDB
+const products = ref([])
+
+onMounted(async () => {
+  try {
+    products.value = await productService.getAll()
+  } catch (err) {
+    console.error('Erro ao carregar produtos', err)
+  }
+})
 
 const filteredProducts = computed(() => {
   return products.value.filter(p =>
@@ -16,9 +24,15 @@ const filteredProducts = computed(() => {
   )
 })
 
-const removeProduct = (id) => {
+const removeProduct = async (id) => {
   if (confirm('Tem certeza que deseja excluir este produto?')) {
-    products.value = products.value.filter(item => item.id !== id)
+    try {
+      await productService.delete(id)
+      products.value = products.value.filter(item => item.id !== id)
+    } catch (err) {
+      console.error('Erro ao excluir produto', err)
+      alert('Erro ao excluir produto.')
+    }
   }
 }
 </script>

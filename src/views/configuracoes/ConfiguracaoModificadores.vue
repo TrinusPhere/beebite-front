@@ -376,7 +376,23 @@ import {
   SlidersHorizontal, Plus, Pencil, Trash2, Layers,
   X, Info, Boxes, ListChecks, MinusCircle
 } from 'lucide-vue-next'
-import { modifierGroupsDB, additionalsDB, productsDB } from '@/utils/mockData'
+import { modifierGroupService } from '@/services/modifierGroupService'
+import { additionalService } from '@/services/additionalService'
+import { productService } from '@/services/productService'
+
+const modifierGroupsDB = ref([])
+const additionalsDB = ref([])
+const productsDB = ref([])
+
+onMounted(async () => {
+  try {
+    modifierGroupsDB.value = await modifierGroupService.getAll()
+    additionalsDB.value = await additionalService.getAll()
+    productsDB.value = await productService.getAll()
+  } catch (err) {
+    console.error('Erro ao carregar configurações:', err)
+  }
+})
 
 // ── Abas ──
 const tabs = [
@@ -433,39 +449,42 @@ const closeGroupModal = () => { showGroupModal.value = false }
 const addOption = () => { groupForm.value.options.push({ name: '', price: 0 }) }
 const removeOption = (i) => { groupForm.value.options.splice(i, 1) }
 
-const saveGroup = () => {
+const saveGroup = async () => {
   if (!groupForm.value.name.trim()) { alert('Nome do grupo é obrigatório.'); return }
   if (!groupForm.value.options.some(o => o.name.trim())) { alert('Adicione ao menos uma opção.'); return }
 
   const validOptions = groupForm.value.options
     .filter(o => o.name.trim())
-    .map(o => ({ ...o, id: `opt-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` }))
+    // Backend creates IDs for options if they are null
 
-  if (editingGroup.value) {
-    // Editar existente
-    const idx = modifierGroupsDB.value.findIndex(g => g.id === editingGroup.value.id)
-    if (idx !== -1) {
-      modifierGroupsDB.value[idx] = {
-        ...modifierGroupsDB.value[idx],
-        ...groupForm.value,
-        options: validOptions,
-      }
-    }
-  } else {
-    // Criar novo
-    modifierGroupsDB.value.push({
-      id: `grp-${Date.now()}`,
+  try {
+    const payload = {
       ...groupForm.value,
-      options: validOptions,
-    })
+      options: validOptions
+    }
+    
+    if (editingGroup.value) {
+      await modifierGroupService.update(editingGroup.value.id, payload)
+    } else {
+      await modifierGroupService.create(payload)
+    }
+    modifierGroupsDB.value = await modifierGroupService.getAll()
+    closeGroupModal()
+  } catch (err) {
+    console.error('Erro ao salvar grupo:', err)
+    alert('Erro ao salvar grupo')
   }
-  closeGroupModal()
 }
 
-const deleteGroup = (groupId) => {
+const deleteGroup = async (groupId) => {
   if (!confirm('Deseja excluir este grupo? Ele será removido de todos os produtos vinculados.')) return
-  const idx = modifierGroupsDB.value.findIndex(g => g.id === groupId)
-  if (idx !== -1) modifierGroupsDB.value.splice(idx, 1)
+  try {
+    await modifierGroupService.delete(groupId)
+    modifierGroupsDB.value = await modifierGroupService.getAll()
+  } catch (err) {
+    console.error('Erro ao excluir grupo:', err)
+    alert('Erro ao excluir grupo')
+  }
 }
 
 // ─────────────────────────────────────────
@@ -484,30 +503,44 @@ const openAdditionalModal = (add) => {
 
 const closeAdditionalModal = () => { showAdditionalModal.value = false }
 
-const saveAdditional = () => {
+const saveAdditional = async () => {
   if (!additionalForm.value.name.trim()) { alert('Nome é obrigatório.'); return }
   if (additionalForm.value.price <= 0) { alert('Preço deve ser maior que zero.'); return }
 
-  if (editingAdditional.value) {
-    const idx = additionalsDB.value.findIndex(a => a.id === editingAdditional.value.id)
-    if (idx !== -1) Object.assign(additionalsDB.value[idx], additionalForm.value)
-  } else {
-    additionalsDB.value.push({
-      id: `add-${Date.now()}`,
-      ...additionalForm.value,
-      active: true,
-    })
+  try {
+    if (editingAdditional.value) {
+      await additionalService.update(editingAdditional.value.id, additionalForm.value)
+    } else {
+      await additionalService.create(additionalForm.value)
+    }
+    additionalsDB.value = await additionalService.getAll()
+    closeAdditionalModal()
+  } catch (err) {
+    console.error('Erro ao salvar adicional:', err)
+    alert('Erro ao salvar adicional')
   }
-  closeAdditionalModal()
 }
 
-const deleteAdditional = (addId) => {
+const deleteAdditional = async (addId) => {
   if (!confirm('Excluir este adicional?')) return
-  const idx = additionalsDB.value.findIndex(a => a.id === addId)
-  if (idx !== -1) additionalsDB.value.splice(idx, 1)
+  try {
+    await additionalService.delete(addId)
+    additionalsDB.value = await additionalService.getAll()
+  } catch (err) {
+    console.error('Erro ao excluir adicional:', err)
+    alert('Erro ao excluir adicional')
+  }
 }
 
-const toggleAdditionalStatus = (add) => { add.active = !add.active }
+const toggleAdditionalStatus = async (add) => { 
+  try {
+    await additionalService.toggleStatus(add.id)
+    additionalsDB.value = await additionalService.getAll()
+  } catch (err) {
+    console.error('Erro ao alternar status do adicional:', err)
+    alert('Erro ao alterar status')
+  }
+}
 
 // ─────────────────────────────────────────
 // ABA 3: Remoções por Produto
@@ -519,19 +552,32 @@ const productsWithSheet = computed(() =>
 )
 
 const isRemovable = (product, ingredientId) =>
-  (product.removableItems || []).includes(ingredientId)
+  (product.removableItemIds || []).includes(ingredientId)
 
-const toggleRemovable = (product, ingredientId) => {
-  if (!product.removableItems) product.removableItems = []
-  const idx = product.removableItems.indexOf(ingredientId)
+const toggleRemovable = async (product, ingredientId) => {
+  if (!product.removableItemIds) product.removableItemIds = []
+  
+  // Create a copy of current removables
+  const currentRemovables = [...product.removableItemIds]
+  const idx = currentRemovables.indexOf(ingredientId)
+  
   if (idx === -1) {
-    product.removableItems.push(ingredientId)
+    currentRemovables.push(ingredientId)
   } else {
-    product.removableItems.splice(idx, 1)
+    currentRemovables.splice(idx, 1)
+  }
+  
+  try {
+    await productService.updateRemovableItems(product.id, currentRemovables)
+    // Update local state after success
+    product.removableItemIds = currentRemovables
+  } catch (err) {
+    console.error('Erro ao atualizar item removível:', err)
+    alert('Erro ao atualizar permissão de remoção')
   }
 }
 
-const countRemovable = (product) => (product.removableItems || []).length
+const countRemovable = (product) => (product.removableItemIds || []).length
 </script>
 
 <style scoped>

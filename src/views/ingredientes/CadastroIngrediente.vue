@@ -3,7 +3,7 @@ import { reactive, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Save, X, Package, DollarSign, Database, ChevronLeft, AlertCircle } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
-import { ingredientsDB } from '@/utils/mockData'
+import { ingredientService } from '@/services/ingredientService'
 
 const router = useRouter()
 const route = useRoute()
@@ -14,40 +14,46 @@ const form = reactive({
   id: null,
   name: '',
   stock: '',
-  unit: 'un',
+  unit: 'UN',
   costPrice: '',
   minStock: ''
 })
 
-onMounted(() => {
+onMounted(async () => {
   if (route.params.id) {
     isEditing.value = true
-    const ingredientId = parseInt(route.params.id)
-    const itemToEdit = ingredientsDB.value.find(i => i.id === ingredientId)
-
-    if (itemToEdit) {
-      Object.assign(form, JSON.parse(JSON.stringify(itemToEdit))) // Deep copy para edição
+    try {
+      const itemToEdit = await ingredientService.getById(route.params.id)
+      if (itemToEdit) {
+        Object.assign(form, itemToEdit)
+      }
+    } catch (err) {
+      console.error('Erro ao carregar ingrediente para edição', err)
+      alert('Ingrediente não encontrado!')
+      router.push('/ingredientes')
     }
   }
 })
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   loading.value = true
-  setTimeout(() => {
+  try {
+    const payload = { ...form }
     if (isEditing.value) {
-      const index = ingredientsDB.value.findIndex(i => i.id === form.id)
-      if (index !== -1) {
-        ingredientsDB.value[index] = { ...form } // Atualiza o ingrediente
-      }
+      await ingredientService.update(form.id, payload)
       alert('Ingrediente atualizado com sucesso!')
     } else {
-      const newId = ingredientsDB.value.length > 0 ? Math.max(...ingredientsDB.value.map(i => i.id)) + 1 : 1
-      ingredientsDB.value.push({ ...form, id: newId }) // Adiciona novo ingrediente
+      delete payload.id
+      await ingredientService.create(payload)
       alert('Ingrediente cadastrado com sucesso!')
     }
-    loading.value = false
     router.push('/ingredientes')
-  }, 1000)
+  } catch (err) {
+    console.error('Erro ao salvar ingrediente', err)
+    alert('Erro ao salvar ingrediente. Verifique os dados.')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

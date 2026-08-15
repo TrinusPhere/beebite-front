@@ -3,45 +3,57 @@ import { reactive, ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Save, X, ShoppingBag, Trash2, Search, ChevronLeft, Calculator, UtensilsCrossed, Plus } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
-import { productsDB, ingredientsDB } from '@/utils/mockData'
+import { productService } from '@/services/productService'
+import { ingredientService } from '@/services/ingredientService'
+import { modifierGroupService } from '@/services/modifierGroupService'
 
 const router = useRouter()
 const route = useRoute()
 const loading = ref(false)
 const isEditing = ref(false)
 
-// Estado para controlar o modal de ingredientes
 const showIngredientModal = ref(false)
-const searchIngredienteModal = ref('') // Para busca dentro do modal
-const selectedIngredientsInModal = ref([]) // IDs dos ingredientes selecionados no modal
-const modalQuantities = ref({}) // Quantidades informadas no modal
+const searchIngredienteModal = ref('')
+const selectedIngredientsInModal = ref([])
+const modalQuantities = ref({})
+
+const availableIngredients = ref([])
+const modifierGroups = ref([])
 
 const form = reactive({
   id: null,
   name: '',
   category: 'Hambúrgueres',
   price: 0,
-  technicalSheet: []
+  technicalSheet: [],
+  modifierGroupIds: [],
+  removableItemIds: []
 })
 
-const availableIngredients = ingredientsDB.value
+onMounted(async () => {
+  try {
+    availableIngredients.value = await ingredientService.getAll()
+    modifierGroups.value = await modifierGroupService.getAll()
 
-onMounted(() => {
-  if (route.params.id) {
-    isEditing.value = true
-    const productId = parseInt(route.params.id)
-    const product = productsDB.value.find(p => p.id === productId)
-    if (product) {
-      Object.assign(form, JSON.parse(JSON.stringify(product))) // Deep copy
+    if (route.params.id) {
+      isEditing.value = true
+      const itemToEdit = await productService.getById(route.params.id)
+      if (itemToEdit) {
+        Object.assign(form, itemToEdit)
+      }
     }
+  } catch (err) {
+    console.error('Erro ao carregar dados', err)
   }
 })
 
 const totalCost = computed(() => {
   return form.technicalSheet.reduce((acc, item) => {
-    // Assumindo que item.cost é o custo por item.unit e item.quantity é a quantidade nessa unidade.
-    // Se precisar de conversão (ex: gramas para kg), isso deve ser feito na quantity ou no cost antes de adicionar à technicalSheet.
-    return acc + (item.cost * item.quantity)
+    const ing = availableIngredients.value.find(i => i.id === item.ingredientId || i.id === item.id)
+    if (ing) {
+      return acc + (ing.costPrice * item.quantity)
+    }
+    return acc
   }, 0)
 })
 
@@ -50,45 +62,40 @@ const profit = computed(() => form.price - totalCost.value)
 const removeIngredient = (index) => form.technicalSheet.splice(index, 1)
 
 const openIngredientModal = () => {
-  // Pre-seleciona os que já estão na ficha técnica do produto
-  selectedIngredientsInModal.value = form.technicalSheet.map(item => item.id);
-  
-  // Pre-popula as quantidades do que já está na ficha técnica
+  selectedIngredientsInModal.value = form.technicalSheet.map(item => item.ingredientId || item.id)
   modalQuantities.value = {}
   form.technicalSheet.forEach(item => {
-    modalQuantities.value[item.id] = item.quantity
+    modalQuantities.value[item.ingredientId || item.id] = item.quantity
   })
-  
   showIngredientModal.value = true
 }
 
 const closeIngredientModal = () => {
   showIngredientModal.value = false
-  searchIngredienteModal.value = '' // Limpa a busca ao fechar
-  selectedIngredientsInModal.value = [] // Limpa as seleções ao fechar
+  searchIngredienteModal.value = ''
+  selectedIngredientsInModal.value = []
 }
 
 const addSelectedIngredientsToSheet = () => {
-  // Remove os que foram desmarcados
   form.technicalSheet = form.technicalSheet.filter(item => 
-    selectedIngredientsInModal.value.includes(item.id)
+    selectedIngredientsInModal.value.includes(item.ingredientId || item.id)
   )
 
-  // Adiciona os novos que foram marcados ou atualiza quantidade
   selectedIngredientsInModal.value.forEach(ingredientId => {
-    const existingItem = form.technicalSheet.find(item => item.id === ingredientId)
-    const quantity = modalQuantities.value[ingredientId] || 1 // default 1
+    const existingItem = form.technicalSheet.find(item => (item.ingredientId || item.id) === ingredientId)
+    const quantity = modalQuantities.value[ingredientId] || 1
 
     if (existingItem) {
       existingItem.quantity = quantity
     } else {
-      const ingredientToAdd = availableIngredients.find(ing => ing.id === ingredientId)
+      const ingredientToAdd = availableIngredients.value.find(ing => ing.id === ingredientId)
       if (ingredientToAdd) {
         form.technicalSheet.push({
+          ingredientId: ingredientToAdd.id,
           id: ingredientToAdd.id,
           name: ingredientToAdd.name,
           unit: ingredientToAdd.unit,
-          cost: ingredientToAdd.price || 0, // Usar price do mockData
+          cost: ingredientToAdd.costPrice || 0,
           quantity: quantity
         })
       }
@@ -97,23 +104,32 @@ const addSelectedIngredientsToSheet = () => {
   closeIngredientModal()
 }
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   loading.value = true
-  setTimeout(() => {
+  try {
+    const payload = { ...form }
+    
+    // map the frontend format to backend format if necessary
+    payload.technicalSheet = payload.technicalSheet.map(i => ({
+      ingredientId: i.ingredientId || i.id,
+      quantity: i.quantity
+    }))
+
     if (isEditing.value) {
-      const index = productsDB.value.findIndex(p => p.id === form.id)
-      if (index !== -1) {
-        productsDB.value[index] = { ...form } // Atualiza o produto
-      }
+      await productService.update(form.id, payload)
       alert('Produto atualizado com sucesso!')
     } else {
-      const newId = productsDB.value.length > 0 ? Math.max(...productsDB.value.map(p => p.id)) + 1 : 1
-      productsDB.value.push({ ...form, id: newId }) // Adiciona novo produto
+      delete payload.id
+      await productService.create(payload)
       alert('Produto cadastrado com sucesso!')
     }
-    loading.value = false
     router.push('/produtos')
-  }, 1000)
+  } catch (err) {
+    console.error('Erro ao salvar produto', err)
+    alert('Erro ao salvar produto. Verifique os dados.')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
