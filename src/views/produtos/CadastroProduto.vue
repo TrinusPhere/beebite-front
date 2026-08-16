@@ -19,6 +19,15 @@ const modalQuantities = ref({})
 
 const availableIngredients = ref([])
 const modifierGroups = ref([])
+const availableCategories = ref([])
+const isCreatingNewCategory = ref(false)
+
+const handleCategoryChange = (e) => {
+  if (e.target.value === 'NEW_CATEGORY_OPTION') {
+    isCreatingNewCategory.value = true
+    form.category = ''
+  }
+}
 
 const form = reactive({
   id: null,
@@ -34,12 +43,16 @@ onMounted(async () => {
   try {
     availableIngredients.value = await ingredientService.getAll()
     modifierGroups.value = await modifierGroupService.getAll()
+    availableCategories.value = await productService.getCategories()
 
     if (route.params.id) {
       isEditing.value = true
       const itemToEdit = await productService.getById(route.params.id)
       if (itemToEdit) {
         Object.assign(form, itemToEdit)
+        if (itemToEdit.category && !availableCategories.value.includes(itemToEdit.category)) {
+          availableCategories.value.push(itemToEdit.category)
+        }
       }
     }
   } catch (err) {
@@ -201,6 +214,41 @@ const handleSubmit = async () => {
             <div class="md:col-span-2 space-y-1">
               <label class="text-xs font-bold text-slate-700 ml-1">Nome do Produto</label>
               <input v-model="form.name" type="text" required class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20">
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs font-bold text-slate-700 ml-1">Categoria</label>
+              
+              <!-- Select para categorias existentes -->
+              <select 
+                v-if="!isCreatingNewCategory" 
+                v-model="form.category" 
+                @change="handleCategoryChange"
+                class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20 font-medium text-slate-700"
+              >
+                <option value="" disabled>Selecione uma categoria</option>
+                <option v-for="cat in availableCategories" :key="cat" :value="cat">{{ cat }}</option>
+                <option value="NEW_CATEGORY_OPTION" class="font-bold text-orange-600">➕ Nova categoria...</option>
+              </select>
+
+              <!-- Input para nova categoria -->
+              <div v-else class="flex gap-2">
+                <input 
+                  v-model="form.category" 
+                  type="text" 
+                  required 
+                  placeholder="Nome da nova categoria..." 
+                  class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20 font-medium"
+                  autofocus
+                >
+                <button 
+                  @click="isCreatingNewCategory = false; form.category = availableCategories[0] || 'Hambúrgueres'" 
+                  type="button" 
+                  class="px-4 bg-slate-100 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-xl transition-all"
+                  title="Cancelar e voltar a selecionar"
+                >
+                  <X :size="18" />
+                </button>
+              </div>
             </div>
             <div class="space-y-1">
               <label class="text-xs font-bold text-slate-700 ml-1">Preço de Venda</label>

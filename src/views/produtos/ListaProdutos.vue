@@ -8,20 +8,25 @@ import { productService } from '@/services/productService'
 const router = useRouter()
 const searchQuery = ref('')
 const products = ref([])
+const availableCategories = ref([])
+const selectedCategory = ref('')
 
 onMounted(async () => {
   try {
     products.value = await productService.getAll()
+    availableCategories.value = await productService.getCategories()
   } catch (err) {
     console.error('Erro ao carregar produtos', err)
   }
 })
 
 const filteredProducts = computed(() => {
-  return products.value.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchQuery.value.toLowerCase())
-  )
+  return products.value.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
+                          p.category.toLowerCase().includes(searchQuery.value.toLowerCase())
+    const matchesCategory = selectedCategory.value === '' || p.category === selectedCategory.value
+    return matchesSearch && matchesCategory
+  })
 })
 
 const removeProduct = async (id) => {
@@ -53,16 +58,20 @@ const removeProduct = async (id) => {
 
     <!-- Tabela Padronizada -->
     <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="p-4 border-b border-slate-100">
-        <div class="relative max-w-md">
+      <div class="p-4 border-b border-slate-100 flex flex-col md:flex-row gap-4">
+        <div class="relative flex-1 max-w-md">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" :size="20" />
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Buscar por nome ou categoria..."
+            placeholder="Buscar por nome..."
             class="w-full bg-slate-50 border border-slate-200 text-sm pl-10 p-2.5 rounded-xl outline-none"
           >
         </div>
+        <select v-model="selectedCategory" class="bg-slate-50 border border-slate-200 text-sm px-4 py-2.5 rounded-xl outline-none font-medium text-slate-600">
+          <option value="">Todas as Categorias</option>
+          <option v-for="cat in availableCategories" :key="cat" :value="cat">{{ cat }}</option>
+        </select>
       </div>
 
       <div class="overflow-x-auto">

@@ -58,8 +58,8 @@
               <div>
                 <h3 class="font-black text-slate-800">{{ group.name }}</h3>
                 <div class="flex items-center gap-2 mt-1 flex-wrap">
-                  <span :class="group.type === 'radio' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'" class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
-                    {{ group.type === 'radio' ? 'Seleção Única' : 'Múltipla Seleção' }}
+                  <span :class="group.type === 'RADIO' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'" class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                    {{ group.type === 'RADIO' ? 'Seleção Única' : 'Múltipla Seleção' }}
                   </span>
                   <span :class="group.required ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'" class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
                     {{ group.required ? 'Obrigatório' : 'Opcional' }}
@@ -83,7 +83,7 @@
             <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">Opções</p>
             <div v-for="opt in group.options" :key="opt.id" class="flex items-center justify-between bg-slate-50 rounded-xl px-3 py-2">
               <div class="flex items-center gap-2">
-                <div :class="group.type === 'radio' ? 'rounded-full' : 'rounded-md'" class="w-3.5 h-3.5 border-2 border-slate-300" />
+                <div :class="group.type === 'RADIO' ? 'rounded-full' : 'rounded-md'" class="w-3.5 h-3.5 border-2 border-slate-300" />
                 <span class="text-sm text-slate-700 font-medium">{{ opt.name }}</span>
               </div>
               <span v-if="opt.price > 0" class="text-xs font-bold text-emerald-600">+R$ {{ opt.price.toFixed(2) }}</span>
@@ -271,7 +271,7 @@
                 <div>
                   <label class="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">Tipo de Seleção *</label>
                   <div class="flex gap-3">
-                    <label v-for="t in [{ v: 'radio', l: 'Única (Radio)' }, { v: 'checkbox', l: 'Múltipla (Checkbox)' }]" :key="t.v" :class="['flex-1 flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all', groupForm.type === t.v ? 'border-orange-500 bg-orange-50' : 'border-slate-100 hover:border-orange-200']">
+                    <label v-for="t in [{ v: 'RADIO', l: 'Única (Radio)' }, { v: 'CHECKBOX', l: 'Múltipla (Checkbox)' }]" :key="t.v" :class="['flex-1 flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all', groupForm.type === t.v ? 'border-orange-500 bg-orange-50' : 'border-slate-100 hover:border-orange-200']">
                       <input type="radio" :value="t.v" v-model="groupForm.type" class="hidden" />
                       <div :class="['w-4 h-4 border-2 flex items-center justify-center shrink-0 transition-all', groupForm.type === t.v ? 'border-orange-500 bg-orange-500 rounded-full' : 'border-slate-300 rounded-full']">
                         <div v-if="groupForm.type === t.v" class="w-1.5 h-1.5 rounded-full bg-white" />
@@ -411,7 +411,7 @@ const editingGroup = ref(null)
 const groupForm = ref({
   name: '',
   icon: '🔧',
-  type: 'radio',
+  type: 'RADIO',
   required: false,
   minSelections: 0,
   maxSelections: 1,
@@ -434,7 +434,7 @@ const openGroupModal = (group) => {
     groupForm.value = {
       name: '',
       icon: '🔧',
-      type: 'radio',
+      type: 'RADIO',
       required: false,
       minSelections: 0,
       maxSelections: 1,

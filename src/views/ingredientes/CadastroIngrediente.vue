@@ -115,10 +115,11 @@ const handleSubmit = async () => {
                 <input v-model="form.stock" type="number" step="0.01" placeholder="0.00" required class="w-full bg-slate-50 border border-slate-200 text-sm pl-10 p-3.5 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all font-bold">
               </div>
               <select v-model="form.unit" class="bg-slate-50 border border-slate-200 text-sm px-4 rounded-xl focus:ring-2 focus:ring-orange-500/20 outline-none font-black text-slate-700 uppercase">
-                <option value="un">UN</option>
-                <option value="kg">KG</option>
-                <option value="lt">LT</option>
-                <option value="gr">GR</option>
+                <option value="UN">UN</option>
+                <option value="KG">KG</option>
+                <option value="G">G</option>
+                <option value="L">L</option>
+                <option value="ML">ML</option>
               </select>
             </div>
           </div>
