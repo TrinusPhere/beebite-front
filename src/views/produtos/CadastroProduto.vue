@@ -257,6 +257,34 @@ const handleSubmit = async () => {
           </div>
         </div>
 
+        <!-- Adicionais e Opções (Modificadores) -->
+        <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+          <div class="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest">
+            <Plus :size="16" /> Adicionais e Opções
+          </div>
+          <p class="text-slate-500 text-sm">Selecione quais grupos de opcionais estarão disponíveis para este produto.</p>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <label v-for="group in modifierGroups" :key="group.id" :class="[
+              'flex items-start gap-3 p-4 border rounded-2xl cursor-pointer transition-all',
+              form.modifierGroupIds.includes(group.id) ? 'border-orange-500 bg-orange-50' : 'border-slate-200 hover:border-orange-200 bg-white'
+            ]">
+              <input type="checkbox" :value="group.id" v-model="form.modifierGroupIds" class="mt-0.5 form-checkbox text-orange-600 rounded">
+              <div class="flex flex-col">
+                <span class="font-bold text-slate-800 text-sm">{{ group.name }}</span>
+                <span class="text-[10px] font-black mt-1 uppercase tracking-wider" :class="group.required ? 'text-red-500' : 'text-slate-400'">
+                  {{ group.required ? 'Obrigatório' : 'Opcional' }}
+                </span>
+                <span class="text-xs text-slate-500 mt-1 font-medium">{{ group.options?.length || 0 }} opções</span>
+              </div>
+            </label>
+          </div>
+          
+          <div v-if="modifierGroups.length === 0" class="text-slate-400 text-sm font-medium text-center py-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            Nenhum grupo de modificadores cadastrado no sistema.
+          </div>
+        </div>
+
         <!-- Ficha Técnica -->
         <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
           <div class="flex items-center justify-between">
@@ -280,6 +308,27 @@ const handleSubmit = async () => {
           </div>
           <div v-else class="text-slate-400 text-sm font-medium text-center py-4">
             Nenhum ingrediente adicionado à ficha técnica.
+          </div>
+        </div>
+
+        <!-- Ingredientes Removíveis -->
+        <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+          <div class="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest">
+            <Trash2 :size="16" /> Ingredientes Removíveis
+          </div>
+          <p class="text-slate-500 text-sm">Marque quais itens da ficha técnica o cliente pode optar por remover.</p>
+          
+          <div v-if="form.technicalSheet.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <label v-for="item in form.technicalSheet" :key="item.id || item.ingredientId" :class="[
+              'flex items-center gap-3 p-4 border rounded-2xl cursor-pointer transition-all',
+              form.removableItemIds.includes(item.ingredientId || item.id) ? 'border-red-500 bg-red-50' : 'border-slate-200 hover:border-red-200 bg-white'
+            ]">
+              <input type="checkbox" :value="item.ingredientId || item.id" v-model="form.removableItemIds" class="form-checkbox text-red-500 rounded">
+              <span class="font-bold text-slate-800 text-sm">{{ item.name }}</span>
+            </label>
+          </div>
+          <div v-else class="text-slate-400 text-sm font-medium text-center py-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            Adicione itens na ficha técnica primeiro.
           </div>
         </div>
       </div>
