@@ -1,13 +1,21 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Search, Edit2, Trash2, Package } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
-import { ingredientsDB } from '@/utils/mockData'
+import { ingredientService } from '@/services/ingredientService'
 
 const router = useRouter()
 const searchQuery = ref('')
-const ingredients = ingredientsDB
+const ingredients = ref([])
+
+onMounted(async () => {
+  try {
+    ingredients.value = await ingredientService.getAll()
+  } catch (err) {
+    console.error('Erro ao carregar ingredientes', err)
+  }
+})
 
 const filteredIngredients = computed(() => {
   return ingredients.value.filter(item =>
@@ -15,9 +23,15 @@ const filteredIngredients = computed(() => {
   )
 })
 
-const removeIngredient = (id) => {
+const removeIngredient = async (id) => {
   if (confirm('Tem certeza que deseja excluir este ingrediente?')) {
-    ingredients.value = ingredients.value.filter(item => item.id !== id)
+    try {
+      await ingredientService.delete(id)
+      ingredients.value = ingredients.value.filter(item => item.id !== id)
+    } catch (err) {
+      console.error('Erro ao excluir ingrediente', err)
+      alert('Erro ao excluir ingrediente.')
+    }
   }
 }
 </script>
@@ -62,7 +76,7 @@ const removeIngredient = (id) => {
             <tr v-for="item in filteredIngredients" :key="item.id" class="hover:bg-slate-50">
               <td class="px-6 py-4 font-bold text-slate-700">{{ item.name }}</td>
               <td class="px-6 py-4 text-center">
-                <span class="px-3 py-1 rounded-full text-[10px] font-black" :class="item.stock < 5 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'">
+                <span class="px-3 py-1 rounded-full text-[10px] font-black" :class="item.lowStock ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'">
                   {{ item.stock }} {{ item.unit }}
                 </span>
               </td>

@@ -43,10 +43,44 @@
           <div class="flex items-center gap-2 mb-3">
             <User :size="16" class="text-orange-500" />
             <h2 class="text-xs font-bold text-slate-700 uppercase tracking-widest">Dados do Cliente</h2>
+            <span v-if="order.customer.id" class="ml-auto text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wider">Cadastrado</span>
+            <span v-else class="ml-auto text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full uppercase tracking-wider">Avulso</span>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <input type="text" v-model="order.customer.name" placeholder="Nome do Cliente (opcional)" class="w-full text-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all">
+            <div class="relative">
+              <input
+                type="text"
+                v-model="customerSearchQuery"
+                @input="onCustomerSearch"
+                @focus="showCustomerDropdown = true"
+                placeholder="Buscar ou digitar nome do cliente..."
+                class="w-full text-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+              >
+              <!-- Dropdown de sugestões -->
+              <div v-if="showCustomerDropdown && customerSuggestions.length > 0" class="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                <button
+                  v-for="c in customerSuggestions"
+                  :key="c.id"
+                  @mousedown.prevent="selectCustomer(c)"
+                  class="w-full text-left px-4 py-2.5 hover:bg-orange-50 transition-colors flex items-center gap-3 border-b border-slate-50 last:border-0"
+                >
+                  <div class="w-7 h-7 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600 font-black text-xs shrink-0">
+                    {{ c.name.charAt(0) }}
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-sm font-bold text-slate-700 truncate">{{ c.name }}</p>
+                    <p class="text-[10px] text-slate-400 truncate">{{ c.phone || '' }} · {{ c.address || 'Sem endereço' }}</p>
+                  </div>
+                </button>
+              </div>
+              <!-- Limpar seleção -->
+              <button
+                v-if="order.customer.id"
+                @click="clearCustomerSelection"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+              >
+                <X :size="14" />
+              </button>
             </div>
             <div v-if="order.type === 'delivery'">
               <input type="text" v-model="order.customer.address" placeholder="Endereço Completo" class="w-full text-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all">
@@ -136,14 +170,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ChevronLeft, User, PackageX } from 'lucide-vue-next'
+import { ChevronLeft, User, PackageX, X } from 'lucide-vue-next'
 import PosProductCard from '@/components/domain/PosProductCard.vue'
 import OrderSummarySidebar from '@/components/domain/OrderSummarySidebar.vue'
 import OrderConfirmationModal from '@/components/domain/OrderConfirmationModal.vue'
 import ItemCustomizationModal from '@/components/ItemCustomizationModal.vue'
-import { productsDB, ordersKanbanDB, financialRecordsDB, modifierGroupsDB } from '@/utils/mockData'
+import { orderService } from '@/services/orderService'
+import { productService } from '@/services/productService'
+import { modifierGroupService } from '@/services/modifierGroupService'
+import { customerService } from '@/services/customerService'
 
 const router = useRouter()
 const route = useRoute()
@@ -162,30 +199,75 @@ const originalItemsText = ref('')     // descrição dos itens originais
 // ── Estado do pedido ──
 const order = ref({
   type: 'balcao',
-  customer: { name: '', address: '' },
+  customer: { id: null, name: '', address: '' },
   items: [],
   paymentMethod: 'pix'
 })
 
-// ── Carregar dados se estiver em modo edição ──
-onMounted(() => {
+// ── Autocomplete de Cliente ──
+const customerSearchQuery = ref('')
+const customerSuggestions = ref([])
+const showCustomerDropdown = ref(false)
+let customerSearchTimeout = null
+
+const onCustomerSearch = () => {
+  order.value.customer.id = null // Limpa vínculo ao digitar
+  order.value.customer.name = customerSearchQuery.value
+  clearTimeout(customerSearchTimeout)
+  if (customerSearchQuery.value.length < 2) {
+    customerSuggestions.value = []
+    return
+  }
+  customerSearchTimeout = setTimeout(async () => {
+    try {
+      customerSuggestions.value = await customerService.getAll(customerSearchQuery.value)
+    } catch (e) {
+      console.error('Erro ao buscar clientes:', e)
+      customerSuggestions.value = []
+    }
+  }, 300)
+}
+
+const selectCustomer = (customer) => {
+  order.value.customer.id = customer.id
+  order.value.customer.name = customer.name
+  order.value.customer.address = customer.address || ''
+  customerSearchQuery.value = customer.name
+  showCustomerDropdown.value = false
+  customerSuggestions.value = []
+}
+
+const clearCustomerSelection = () => {
+  order.value.customer.id = null
+  order.value.customer.name = ''
+  order.value.customer.address = ''
+  customerSearchQuery.value = ''
+  customerSuggestions.value = []
+}
+
+// ── Carregar dados ──
+onMounted(async () => {
+  await loadCatalog()
+
   if (isEditMode.value) {
-    for (const col of ordersKanbanDB.value) {
-      const found = col.orders.find(o => o.id === editOrderId.value)
+    try {
+      const found = await orderService.getById(editOrderId.value)
       if (found) {
         originalOrderRef = found
-        originalColRef = col
-        // Pre-preencher o formulário com os dados do pedido existente
-        order.value.type = found.type || 'balcao'
-        order.value.paymentMethod = found.paymentMethod || 'pix'
-        order.value.customer.name = found.customer || ''
-        order.value.customer.address = found.address || ''
-        // Guardar total e itens originais (armazenados como string no mock)
-        const totalStr = (found.total || 'R$ 0').replace('R$ ', '').replace(',', '.')
-        originalTotal.value = parseFloat(totalStr) || 0
-        originalItemsText.value = found.items || ''
-        break
+        order.value.type = found.type.toLowerCase() || 'balcao'
+        order.value.paymentMethod = found.paymentMethod?.toLowerCase() || 'pix'
+        order.value.customer.id = found.customerId || null
+        order.value.customer.name = found.customerName || ''
+        order.value.customer.address = found.customerAddress || ''
+        customerSearchQuery.value = found.customerName || ''
+
+        originalTotal.value = found.totalValue || 0
+        originalItemsText.value = found.items.map(item => `${item.quantity}x ${item.productName}`).join(', ')
       }
+    } catch (error) {
+      console.error('Erro ao carregar pedido:', error)
+      alert('Erro ao carregar pedido.')
+      router.push('/pedidos')
     }
   }
 })
@@ -217,17 +299,35 @@ const sidebarOrder = computed(() => {
 })
 
 // ── Cardápio e filtros ──
-const availableProducts = productsDB.value
-const allModifierGroups = modifierGroupsDB.value
+const availableProducts = ref([])
+const allModifierGroups = ref([])
 const selectedCategory = ref(null)
+const loadingProducts = ref(true)
+
+const loadCatalog = async () => {
+  loadingProducts.value = true
+  try {
+    const [products, modGroups] = await Promise.all([
+      productService.getAll(),
+      modifierGroupService.getAll()
+    ])
+    availableProducts.value = products
+    allModifierGroups.value = modGroups
+  } catch (error) {
+    console.error('Erro ao carregar catálogo:', error)
+    alert('Erro ao carregar produtos. Verifique se o backend está rodando.')
+  } finally {
+    loadingProducts.value = false
+  }
+}
 
 const productCategories = computed(() => {
-  return [...new Set(availableProducts.map(p => p.category))]
+  return [...new Set(availableProducts.value.map(p => p.category))]
 })
 
 const filteredProducts = computed(() => {
-  if (!selectedCategory.value) return availableProducts
-  return availableProducts.filter(p => p.category === selectedCategory.value)
+  if (!selectedCategory.value) return availableProducts.value
+  return availableProducts.value.filter(p => p.category === selectedCategory.value)
 })
 
 // ── Modal de Customização ──
@@ -296,49 +396,50 @@ const placeOrder = async () => {
   loading.value = true
   showConfirmationModal.value = false
   
-  setTimeout(() => {
-    const itemsDescription = order.value.items.map(item => {
-      const mods = item.modifiers.map(m => m.optionName).join(', ')
-      const rems = item.removals.map(r => `Sem ${r.name}`).join(', ')
-      const obs = item.observation ? `[${item.observation}]` : ''
-      const extra = [mods, rems, obs].filter(Boolean).join(' | ')
-      return `${item.quantity}x ${item.product.name}${extra ? ` (${extra})` : ''}`
-    }).join(', ')
+  try {
+    const orderItemsDto = order.value.items.map(item => ({
+      productId: item.product.id,
+      quantity: item.quantity,
+      observation: item.observation || null,
+      modifiers: item.modifiers?.map(m => ({ groupId: m.groupId, optionId: m.optionId })) || [],
+      removalIds: item.removals?.map(r => r.id) || []
+    }))
 
-    if (isEditMode.value && originalOrderRef) {
-      // Atualizar o pedido existente
-      originalOrderRef.customer = order.value.customer.name || originalOrderRef.customer
-      originalOrderRef.address = order.value.customer.address || ''
-      originalOrderRef.type = order.value.type
-      originalOrderRef.paymentMethod = order.value.paymentMethod
-      if (order.value.items.length > 0) {
-        originalOrderRef.items = itemsDescription
-        originalOrderRef.total = `R$ ${totalOrderPrice.value.toFixed(2)}`
-      }
-    } else {
-      // Criar novo pedido
-      const newOrderId = `#${Math.floor(Math.random() * 10000)}`
-      const newOrder = {
-        id: newOrderId,
-        customer: order.value.customer.name || 'Cliente Padrão',
-        items: itemsDescription,
-        time: 'Agora',
-        total: `R$ ${totalOrderPrice.value.toFixed(2)}`,
-        selected: false,
-        type: order.value.type,
-        paymentMethod: order.value.paymentMethod,
-        driver: null
-      }
-
-      const initialColumn = ordersKanbanDB.value.find(col => col.id === 'analise')
-      if (initialColumn) {
-        initialColumn.orders.unshift(newOrder)
-      }
+    const customerInfo = {
+      id: order.value.customer.id || null,
+      name: order.value.customer.name || customerSearchQuery.value,
+      address: order.value.customer.address
     }
 
-    loading.value = false
+    if (isEditMode.value) {
+      const updateData = {
+        type: order.value.type.toUpperCase(),
+        customer: customerInfo,
+        paymentMethod: order.value.paymentMethod.toUpperCase(),
+        newItems: orderItemsDto
+      }
+      await orderService.update(editOrderId.value, updateData)
+      alert('Pedido atualizado com sucesso!')
+    } else {
+      const createData = {
+        type: order.value.type.toUpperCase(),
+        customer: customerInfo,
+        paymentMethod: order.value.paymentMethod.toUpperCase(),
+        items: orderItemsDto,
+        deliveryCost: deliveryCost.value
+      }
+      await orderService.create(createData)
+      alert('Pedido criado com sucesso!')
+    }
+
     router.push({ name: 'pedidos' })
-  }, 800)
+  } catch (error) {
+    console.error('Erro ao salvar pedido:', error)
+    const msg = error.response?.data?.message || 'Erro ao salvar pedido.'
+    alert(msg)
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

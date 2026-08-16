@@ -3,45 +3,90 @@ import { reactive, ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Save, X, ShoppingBag, Trash2, Search, ChevronLeft, Calculator, UtensilsCrossed, Plus } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
-import { productsDB, ingredientsDB } from '@/utils/mockData'
+import { productService } from '@/services/productService'
+import { ingredientService } from '@/services/ingredientService'
+import { modifierGroupService } from '@/services/modifierGroupService'
+import categoryService from '@/services/categoryService'
 
 const router = useRouter()
 const route = useRoute()
 const loading = ref(false)
 const isEditing = ref(false)
 
-// Estado para controlar o modal de ingredientes
 const showIngredientModal = ref(false)
-const searchIngredienteModal = ref('') // Para busca dentro do modal
-const selectedIngredientsInModal = ref([]) // IDs dos ingredientes selecionados no modal
-const modalQuantities = ref({}) // Quantidades informadas no modal
+const searchIngredienteModal = ref('')
+const selectedIngredientsInModal = ref([])
+const modalQuantities = ref({})
+
+const availableIngredients = ref([])
+const modifierGroups = ref([])
+const availableCategories = ref([])
+const isCreatingNewCategory = ref(false)
+const newCategoryName = ref('')
+
+const handleCategoryChange = (e) => {
+  if (e.target.value === 'NEW_CATEGORY_OPTION') {
+    isCreatingNewCategory.value = true
+    form.categoryId = ''
+  } else {
+    // Check for default modifiers
+    const selectedCat = availableCategories.value.find(c => c.id === e.target.value)
+    if (selectedCat && selectedCat.defaultModifierGroupIds && selectedCat.defaultModifierGroupIds.length > 0) {
+      if (confirm(`Esta categoria possui modificadores padrão. Deseja aplicar os adicionais padrão ao produto?`)) {
+        form.modifierGroupIds = [...new Set([...form.modifierGroupIds, ...selectedCat.defaultModifierGroupIds])]
+      }
+    }
+  }
+}
+
+const saveNewCategory = async () => {
+  if (!newCategoryName.value.trim()) return
+  try {
+    const created = await categoryService.createCategory({ name: newCategoryName.value.trim() })
+    availableCategories.value.push(created)
+    form.categoryId = created.id
+    isCreatingNewCategory.value = false
+    newCategoryName.value = ''
+  } catch (err) {
+    alert('Erro ao criar categoria')
+  }
+}
 
 const form = reactive({
   id: null,
   name: '',
-  category: 'Hambúrgueres',
+  categoryId: '',
   price: 0,
-  technicalSheet: []
+  technicalSheet: [],
+  modifierGroupIds: [],
+  removableItemIds: []
 })
 
-const availableIngredients = ingredientsDB.value
+onMounted(async () => {
+  try {
+    availableIngredients.value = await ingredientService.getAll()
+    modifierGroups.value = await modifierGroupService.getAll()
+    availableCategories.value = await categoryService.getCategories()
 
-onMounted(() => {
-  if (route.params.id) {
-    isEditing.value = true
-    const productId = parseInt(route.params.id)
-    const product = productsDB.value.find(p => p.id === productId)
-    if (product) {
-      Object.assign(form, JSON.parse(JSON.stringify(product))) // Deep copy
+    if (route.params.id) {
+      isEditing.value = true
+      const itemToEdit = await productService.getById(route.params.id)
+      if (itemToEdit) {
+        Object.assign(form, itemToEdit)
+      }
     }
+  } catch (err) {
+    console.error('Erro ao carregar dados', err)
   }
 })
 
 const totalCost = computed(() => {
   return form.technicalSheet.reduce((acc, item) => {
-    // Assumindo que item.cost é o custo por item.unit e item.quantity é a quantidade nessa unidade.
-    // Se precisar de conversão (ex: gramas para kg), isso deve ser feito na quantity ou no cost antes de adicionar à technicalSheet.
-    return acc + (item.cost * item.quantity)
+    const ing = availableIngredients.value.find(i => i.id === item.ingredientId || i.id === item.id)
+    if (ing) {
+      return acc + (ing.costPrice * item.quantity)
+    }
+    return acc
   }, 0)
 })
 
@@ -50,45 +95,40 @@ const profit = computed(() => form.price - totalCost.value)
 const removeIngredient = (index) => form.technicalSheet.splice(index, 1)
 
 const openIngredientModal = () => {
-  // Pre-seleciona os que já estão na ficha técnica do produto
-  selectedIngredientsInModal.value = form.technicalSheet.map(item => item.id);
-  
-  // Pre-popula as quantidades do que já está na ficha técnica
+  selectedIngredientsInModal.value = form.technicalSheet.map(item => item.ingredientId || item.id)
   modalQuantities.value = {}
   form.technicalSheet.forEach(item => {
-    modalQuantities.value[item.id] = item.quantity
+    modalQuantities.value[item.ingredientId || item.id] = item.quantity
   })
-  
   showIngredientModal.value = true
 }
 
 const closeIngredientModal = () => {
   showIngredientModal.value = false
-  searchIngredienteModal.value = '' // Limpa a busca ao fechar
-  selectedIngredientsInModal.value = [] // Limpa as seleções ao fechar
+  searchIngredienteModal.value = ''
+  selectedIngredientsInModal.value = []
 }
 
 const addSelectedIngredientsToSheet = () => {
-  // Remove os que foram desmarcados
   form.technicalSheet = form.technicalSheet.filter(item => 
-    selectedIngredientsInModal.value.includes(item.id)
+    selectedIngredientsInModal.value.includes(item.ingredientId || item.id)
   )
 
-  // Adiciona os novos que foram marcados ou atualiza quantidade
   selectedIngredientsInModal.value.forEach(ingredientId => {
-    const existingItem = form.technicalSheet.find(item => item.id === ingredientId)
-    const quantity = modalQuantities.value[ingredientId] || 1 // default 1
+    const existingItem = form.technicalSheet.find(item => (item.ingredientId || item.id) === ingredientId)
+    const quantity = modalQuantities.value[ingredientId] || 1
 
     if (existingItem) {
       existingItem.quantity = quantity
     } else {
-      const ingredientToAdd = availableIngredients.find(ing => ing.id === ingredientId)
+      const ingredientToAdd = availableIngredients.value.find(ing => ing.id === ingredientId)
       if (ingredientToAdd) {
         form.technicalSheet.push({
+          ingredientId: ingredientToAdd.id,
           id: ingredientToAdd.id,
           name: ingredientToAdd.name,
           unit: ingredientToAdd.unit,
-          cost: ingredientToAdd.price || 0, // Usar price do mockData
+          cost: ingredientToAdd.costPrice || 0,
           quantity: quantity
         })
       }
@@ -97,23 +137,32 @@ const addSelectedIngredientsToSheet = () => {
   closeIngredientModal()
 }
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   loading.value = true
-  setTimeout(() => {
+  try {
+    const payload = { ...form }
+    
+    // map the frontend format to backend format if necessary
+    payload.technicalSheet = payload.technicalSheet.map(i => ({
+      ingredientId: i.ingredientId || i.id,
+      quantity: i.quantity
+    }))
+
     if (isEditing.value) {
-      const index = productsDB.value.findIndex(p => p.id === form.id)
-      if (index !== -1) {
-        productsDB.value[index] = { ...form } // Atualiza o produto
-      }
+      await productService.update(form.id, payload)
       alert('Produto atualizado com sucesso!')
     } else {
-      const newId = productsDB.value.length > 0 ? Math.max(...productsDB.value.map(p => p.id)) + 1 : 1
-      productsDB.value.push({ ...form, id: newId }) // Adiciona novo produto
+      delete payload.id
+      await productService.create(payload)
       alert('Produto cadastrado com sucesso!')
     }
-    loading.value = false
     router.push('/produtos')
-  }, 1000)
+  } catch (err) {
+    console.error('Erro ao salvar produto', err)
+    alert('Erro ao salvar produto. Verifique os dados.')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -187,9 +236,79 @@ const handleSubmit = () => {
               <input v-model="form.name" type="text" required class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20">
             </div>
             <div class="space-y-1">
+              <label class="text-xs font-bold text-slate-700 ml-1">Categoria</label>
+              
+              <!-- Select para categorias existentes -->
+              <select 
+                v-if="!isCreatingNewCategory" 
+                v-model="form.categoryId" 
+                @change="handleCategoryChange"
+                class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20 font-medium text-slate-700"
+              >
+                <option value="" disabled>Selecione uma categoria</option>
+                <option v-for="cat in availableCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+                <option value="NEW_CATEGORY_OPTION" class="font-bold text-orange-600">➕ Nova categoria...</option>
+              </select>
+
+              <div v-else class="flex gap-2">
+                <input 
+                  v-model="newCategoryName" 
+                  type="text" 
+                  placeholder="Nome da nova categoria..." 
+                  class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20 font-medium"
+                  autofocus
+                  @keyup.enter="saveNewCategory"
+                >
+                <button 
+                  @click="saveNewCategory"
+                  type="button" 
+                  class="px-4 bg-orange-100 text-orange-600 hover:bg-orange-200 rounded-xl transition-all"
+                  title="Salvar"
+                >
+                  <Save :size="18" />
+                </button>
+                <button 
+                  @click="isCreatingNewCategory = false; form.categoryId = availableCategories[0]?.id || ''" 
+                  type="button" 
+                  class="px-4 bg-slate-100 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-xl transition-all"
+                  title="Cancelar e voltar a selecionar"
+                >
+                  <X :size="18" />
+                </button>
+              </div>
+            </div>
+            <div class="space-y-1">
               <label class="text-xs font-bold text-slate-700 ml-1">Preço de Venda</label>
               <input v-model="form.price" type="number" step="0.01" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20 font-bold text-orange-600">
             </div>
+          </div>
+        </div>
+
+        <!-- Adicionais e Opções (Modificadores) -->
+        <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+          <div class="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest">
+            <Plus :size="16" /> Adicionais e Opções
+          </div>
+          <p class="text-slate-500 text-sm">Selecione quais grupos de opcionais estarão disponíveis para este produto.</p>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <label v-for="group in modifierGroups" :key="group.id" :class="[
+              'flex items-start gap-3 p-4 border rounded-2xl cursor-pointer transition-all',
+              form.modifierGroupIds.includes(group.id) ? 'border-orange-500 bg-orange-50' : 'border-slate-200 hover:border-orange-200 bg-white'
+            ]">
+              <input type="checkbox" :value="group.id" v-model="form.modifierGroupIds" class="mt-0.5 form-checkbox text-orange-600 rounded">
+              <div class="flex flex-col">
+                <span class="font-bold text-slate-800 text-sm">{{ group.name }}</span>
+                <span class="text-[10px] font-black mt-1 uppercase tracking-wider" :class="group.required ? 'text-red-500' : 'text-slate-400'">
+                  {{ group.required ? 'Obrigatório' : 'Opcional' }}
+                </span>
+                <span class="text-xs text-slate-500 mt-1 font-medium">{{ group.options?.length || 0 }} opções</span>
+              </div>
+            </label>
+          </div>
+          
+          <div v-if="modifierGroups.length === 0" class="text-slate-400 text-sm font-medium text-center py-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            Nenhum grupo de modificadores cadastrado no sistema.
           </div>
         </div>
 
@@ -216,6 +335,27 @@ const handleSubmit = () => {
           </div>
           <div v-else class="text-slate-400 text-sm font-medium text-center py-4">
             Nenhum ingrediente adicionado à ficha técnica.
+          </div>
+        </div>
+
+        <!-- Ingredientes Removíveis -->
+        <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+          <div class="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest">
+            <Trash2 :size="16" /> Ingredientes Removíveis
+          </div>
+          <p class="text-slate-500 text-sm">Marque quais itens da ficha técnica o cliente pode optar por remover.</p>
+          
+          <div v-if="form.technicalSheet.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <label v-for="item in form.technicalSheet" :key="item.id || item.ingredientId" :class="[
+              'flex items-center gap-3 p-4 border rounded-2xl cursor-pointer transition-all',
+              form.removableItemIds.includes(item.ingredientId || item.id) ? 'border-red-500 bg-red-50' : 'border-slate-200 hover:border-red-200 bg-white'
+            ]">
+              <input type="checkbox" :value="item.ingredientId || item.id" v-model="form.removableItemIds" class="form-checkbox text-red-500 rounded">
+              <span class="font-bold text-slate-800 text-sm">{{ item.name }}</span>
+            </label>
+          </div>
+          <div v-else class="text-slate-400 text-sm font-medium text-center py-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            Adicione itens na ficha técnica primeiro.
           </div>
         </div>
       </div>

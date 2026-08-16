@@ -304,7 +304,9 @@ const decreaseQty = () => { if (quantity.value > 1) quantity.value-- }
 // ── Grupos de modificadores ativos para este produto ──
 const activeModifierGroups = computed(() => {
   if (!props.product?.modifierGroupIds?.length) return []
-  return props.allModifierGroups.filter(g => props.product.modifierGroupIds.includes(g.id))
+  return props.allModifierGroups
+    .filter(g => props.product.modifierGroupIds.includes(g.id))
+    .map(g => ({ ...g, type: g.type?.toLowerCase() || 'radio' }))
 })
 
 // ── Ingredientes removíveis deste produto ──

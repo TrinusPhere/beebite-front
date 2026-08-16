@@ -16,8 +16,9 @@ import {
   Utensils, // Ícone
 } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
-import ChatDrawer from '@/components/ChatDrawer.vue' // Importar o ChatDrawer
-import { ordersKanbanDB, motoboysDB } from '@/utils/mockData'
+import ChatDrawer from '@/components/ChatDrawer.vue'
+import { orderService } from '@/services/orderService'
+import { driverService } from '@/services/driverService'
 
 // --- Variáveis para o Novo Botão Flutuante de Abas ---
 const isChatWidgetOpen = ref(false)
@@ -29,11 +30,32 @@ const toggleChatWidget = () => {
 
 const router = useRouter()
 
-// Filtros ativos
-const activeFilters = ref(['delivery', 'balcao'])
+const activeFilters = ref(['BALCAO', 'DELIVERY'])
 const openMenuId = ref(null)
 
-const columns = ordersKanbanDB.value
+const columns = ref([])
+
+const fetchKanban = async () => {
+  try {
+    const data = await orderService.getKanban()
+    columns.value = data.columns
+  } catch (error) {
+    console.error('Erro ao buscar kanban:', error)
+  }
+}
+
+onMounted(() => {
+  fetchKanban()
+  loadDrivers()
+})
+
+const formatTime = (isoString) => {
+  if (!isoString) return '--:--'
+  try {
+    const date = new Date(isoString)
+    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  } catch { return '--:--' }
+}
 
 // --- Lógica do Chat Drawer ---
 const showChatDrawer = ref(false)
@@ -60,16 +82,23 @@ const toggleMenu = (id) => {
   openMenuId.value = openMenuId.value === id ? null : id
 }
 
-const deleteOrder = (id, colIndex) => {
+const deleteOrder = async (id, colIndex) => {
   if (confirm('Tem certeza que deseja excluir este pedido?')) {
-    columns[colIndex].orders = columns[colIndex].orders.filter(o => o.id !== id)
-    openMenuId.value = null
+    try {
+      await orderService.delete(id)
+      columns.value[colIndex].orders = columns.value[colIndex].orders.filter(o => o.id !== id)
+      openMenuId.value = null
+    } catch (error) {
+      console.error('Erro ao deletar pedido:', error)
+      alert('Erro ao excluir pedido.')
+    }
   }
 }
 
 // Computado para aplicar o filtro nas colunas
 const filteredColumns = computed(() => {
-  return columns.map(col => ({
+  if (!columns.value) return []
+  return columns.value.map(col => ({
     ...col,
     orders: col.orders.filter(order => activeFilters.value.includes(order.type))
   }))
@@ -100,9 +129,18 @@ const selectedOrders = computed(() => {
 
 // --- Nova funcionalidade: Atribuição de Motoboy ---
 const showMotoboyModal = ref(false)
-const motoboys = motoboysDB.value
+const motoboys = ref([])
 const selectedMotoboyId = ref(null)
 const ordersToAssign = ref([]) // Armazena os pedidos que precisam de motoboy atribuído
+const pendingAdvanceOrderId = ref(null) // Order ID pendente de advance após atribuir motoboy
+
+const loadDrivers = async () => {
+  try {
+    motoboys.value = await driverService.getAll()
+  } catch (e) {
+    console.error('Erro ao carregar entregadores:', e)
+  }
+}
 
 const openMotoboyModal = (orders) => {
   ordersToAssign.value = orders
@@ -116,37 +154,39 @@ const closeMotoboyModal = () => {
   selectedMotoboyId.value = null
 }
 
-const assignMotoboy = () => {
+const assignMotoboy = async () => {
   if (!selectedMotoboyId.value) {
     alert('Por favor, selecione um motoboy.')
     return
   }
-  const motoboy = motoboys.find(m => m.id === selectedMotoboyId.value)
+  const motoboy = motoboys.value.find(m => m.id === selectedMotoboyId.value)
   if (!motoboy) {
     alert('Motoboy selecionado inválido.')
     return
   }
 
-  const rotaColumnIndex = columns.findIndex(col => col.id === 'rota')
-  if (rotaColumnIndex === -1) {
-    console.error("Coluna 'Em Rota de Entrega' não encontrada.")
-    closeMotoboyModal()
-    return
-  }
+  try {
+    await orderService.batchAssignDriver(
+      ordersToAssign.value.map(o => o.id),
+      motoboy.id,
+      motoboy.name
+    )
 
-  ordersToAssign.value.forEach(orderInfo => {
-    // Encontrar o pedido na sua coluna original e removê-lo
-    const originalCol = columns[orderInfo.colIndex]
-    const orderIndex = originalCol.orders.findIndex(o => o.id === orderInfo.id)
-    if (orderIndex !== -1) {
-      const [order] = originalCol.orders.splice(orderIndex, 1)
-      order.selected = false // Desmarcar se fazia parte de uma movimentação em massa
-      order.driver = motoboy.name // Atribuir motoboy
-      columns[rotaColumnIndex].orders.unshift(order) // Adicionar à coluna 'rota'
+    // Se há um pedido pendente de advance, avançar agora
+    if (pendingAdvanceOrderId.value) {
+      const advanceId = pendingAdvanceOrderId.value
+      pendingAdvanceOrderId.value = null
+      closeMotoboyModal()
+      await orderService.advanceStatus(advanceId)
+      await fetchKanban()
+    } else {
+      await fetchKanban()
+      closeMotoboyModal()
     }
-  })
-
-  closeMotoboyModal()
+  } catch (error) {
+    console.error('Erro ao atribuir motoboy:', error)
+    alert(error.response?.data?.message || 'Erro ao atribuir motoboy.')
+  }
 }
 
 // --- Lógica de Drag and Drop e Sincronização iFood ---
@@ -195,7 +235,7 @@ const onDrop = (event, toColIndex) => {
   if (toColumn.id === 'finalizado') {
     const driverName = order.driver || 'Não aplicável (Balcão)'
     setTimeout(() => {
-      alert(`Mensagem automática enviada via WhatsApp para o cliente ${order.customer} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`)
+      alert(`Mensagem automática enviada via WhatsApp para o cliente ${order.customerName} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`)
     }, 500)
   }
 
@@ -333,10 +373,58 @@ const moveOrder = (orderId, currentColumnIndex) => {
         const driverName = order.driver || 'Não aplicável (Balcão)'
         // Simulação do envio de mensagem de avaliação
         setTimeout(() => {
-          alert(`Mensagem automática enviada via WhatsApp para o cliente ${order.customer} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`)
+          alert(`Mensagem automática enviada via WhatsApp para o cliente ${order.customerName} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`)
         }, 500)
       }
     }
+  }
+}
+
+const advanceOrder = async (orderId) => {
+  // Buscar o pedido nas colunas do kanban para verificar tipo e coluna atual
+  let orderData = null
+  let columnId = null
+  for (const col of columns.value) {
+    const found = col.orders.find(o => o.id === orderId)
+    if (found) {
+      orderData = found
+      columnId = col.id
+      break
+    }
+  }
+
+  // Se é DELIVERY e está em PREPARO → abrir modal de motoboy antes
+  if (orderData && orderData.type === 'DELIVERY' && columnId === 'PREPARO' && !orderData.driverName) {
+    pendingAdvanceOrderId.value = orderId
+    openMotoboyModal([{ id: orderId }])
+    return
+  }
+
+  try {
+    await orderService.advanceStatus(orderId)
+    await fetchKanban()
+    openMenuId.value = null
+  } catch (error) {
+    console.error('Erro ao avançar pedido:', error)
+    if (error.response?.status === 422) {
+       alert(error.response.data.message || 'Erro ao avançar pedido (ação inválida).')
+    } else {
+       alert('Erro ao avançar status.')
+    }
+  }
+}
+
+const processBatchMove = async (orders, action) => {
+  if (action === 'avance' || action === 'send_to_kitchen') {
+    try {
+      await orderService.batchMove(orders.map(o => o.id), 'PREPARO')
+      await fetchKanban()
+      orders.forEach(o => o.selected = false)
+    } catch (error) {
+      console.error('Erro ao mover em lote:', error)
+    }
+  } else if (action === 'assign_driver') {
+    openMotoboyModal(orders)
   }
 }
 
@@ -389,6 +477,23 @@ const goToNewOrder = () => {
   router.push({ name: 'novo-pedido' })
 }
 
+const printReceipt = (orderId) => {
+  alert(`Imprimindo cupom do pedido #${orderId}`)
+  openMenuId.value = null
+}
+
+const emitNfe = async (orderId) => {
+  try {
+    await orderService.emitNfe(orderId)
+    alert(`NF-e emitida com sucesso para o pedido #${orderId}!`)
+    await fetchKanban()
+  } catch (error) {
+    console.error('Erro ao emitir NF-e:', error)
+    alert('Erro ao emitir NF-e')
+  }
+  openMenuId.value = null
+}
+
 const editOrder = (orderId) => {
   openMenuId.value = null
   router.push({ name: 'editar-pedido', params: { id: orderId } })
@@ -412,18 +517,31 @@ const emitirNFe = (order) => {
 
         <div class="flex items-center gap-3">
           <div class="bg-white border border-slate-200 p-1 rounded-2xl flex gap-1 shadow-sm">
-            <button @click="toggleFilter('delivery')" :class="[
-                'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all',
-                activeFilters.includes('delivery') ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'text-slate-400 hover:bg-slate-50'
-              ]">
-              <Bike :size="16" /> Delivery
-            </button>
-            <button @click="toggleFilter('balcao')" :class="[
-                'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all',
-                activeFilters.includes('balcao') ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'text-slate-400 hover:bg-slate-50'
-              ]">
-              <Store :size="16" /> Balcão
-            </button>
+          <button 
+            @click="toggleFilter('BALCAO')"
+            :class="[
+              'px-4 py-2 rounded-xl text-sm font-bold transition-all border flex items-center gap-2',
+              activeFilters.includes('BALCAO')
+                ? 'bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-500/20'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300'
+            ]"
+          >
+            <Store :size="16" />
+            Balcão
+          </button>
+          
+          <button 
+            @click="toggleFilter('DELIVERY')"
+            :class="[
+              'px-4 py-2 rounded-xl text-sm font-bold transition-all border flex items-center gap-2',
+              activeFilters.includes('DELIVERY')
+                ? 'bg-blue-500 text-white border-blue-500 shadow-sm shadow-blue-500/20'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
+            ]"
+          >
+            <Bike :size="16" />
+            Delivery
+          </button>
           </div>
           <BaseButton variant="primary" size="md" @click="goToNewOrder">Novo Pedido</BaseButton>
         </div>
@@ -482,12 +600,12 @@ const emitirNFe = (order) => {
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <input v-model="order.selected" type="checkbox" class="w-4 h-4 rounded border-slate-300 text-orange-600 transition-all cursor-pointer">
-                  <span :class="['text-xs font-black tracking-tight', column.color]">{{ order.id }}</span>
+                  <span :class="['text-xs font-black tracking-tight', column.color]">{{ order.displayId || order.id }}</span>
                 </div>
 
                 <div class="flex items-center gap-2">
                   <div class="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">
-                    <Timer :size="10" /> {{ order.time }}
+                    <Timer :size="10" /> {{ formatTime(order.createdAt) }}
                   </div>
 
                   <div class="relative">
@@ -503,6 +621,10 @@ const emitirNFe = (order) => {
                         <button @click.stop="emitirNFe(order)" class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
                           <FileText :size="14" class="text-emerald-500" /> Emitir NF-e
                         </button>
+                        <button v-if="colIndex < filteredColumns.length - 1" @click="advanceOrder(order.id)" class="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2">
+                          <ChevronRight :size="16" />
+                          Avançar Status
+                        </button>
                         <button @click="deleteOrder(order.id, colIndex)" class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">
                           <Trash2 :size="14" /> Excluir
                         </button>
@@ -514,20 +636,23 @@ const emitirNFe = (order) => {
 
               <!-- Customer & Driver -->
               <div>
-                <h4 class="font-bold text-slate-800 text-xs truncate">{{ order.customer }}</h4>
-                <div v-if="order.driver" class="flex items-center gap-1 text-[10px] font-bold text-blue-600 mt-0.5">
-                  <User :size="10" /> {{ order.driver }}
+                <h4 class="font-bold text-slate-800 text-xs truncate">{{ order.customerName || 'Cliente Avulso' }}</h4>
+                <div v-if="order.type === 'BALCAO'" class="px-2 py-1 bg-orange-100 text-orange-600 rounded-md text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                  <Store :size="10" /> Balcão
+                </div>
+                <div v-else-if="order.type === 'DELIVERY'" class="px-2 py-1 bg-blue-100 text-blue-600 rounded-md text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                  <Bike :size="10" /> Delivery
                 </div>
               </div>
 
               <!-- Items (Compact) -->
-              <p class="text-[10px] text-slate-500 font-medium leading-tight line-clamp-2">{{ order.items }}</p>
+              <p class="text-[10px] text-slate-500 font-medium leading-tight line-clamp-2">{{ order.itemsSummary }}</p>
 
               <!-- Footer: Total & Action -->
               <div class="flex items-center justify-between mt-1 pt-2 border-t border-slate-50">
-                <span class="text-xs font-black text-orange-600">R$ {{ order.total.replace('R$ ', '') }}</span>
+                <span class="text-xs font-black text-orange-600">R$ {{ (order.totalValue || 0).toFixed(2) }}</span>
 
-                <button v-if="colIndex < columns.length - 1" @click="moveOrder(order.id, colIndex)" class="px-2 py-1 bg-slate-50 hover:bg-orange-50 text-slate-500 hover:text-orange-600 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 border border-slate-200 hover:border-orange-200">
+                <button v-if="colIndex < filteredColumns.length - 1" @click="advanceOrder(order.id)" class="px-2 py-1 bg-slate-50 hover:bg-orange-50 text-slate-500 hover:text-orange-600 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 border border-slate-200 hover:border-orange-200">
                   Avançar <ChevronRight :size="12" />
                 </button>
               </div>

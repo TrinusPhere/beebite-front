@@ -3,7 +3,7 @@ import { reactive, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Save, X, User, Phone, MapPin, Mail, ChevronLeft, AlertCircle } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
-import { clientsDB } from '@/utils/mockData'
+import { customerService } from '@/services/customerService'
 
 const router = useRouter()
 const route = useRoute()
@@ -22,34 +22,39 @@ const form = reactive({
   neighborhood: ''
 })
 
-onMounted(() => {
+onMounted(async () => {
   if (route.params.id) {
     isEditing.value = true
-    const clientId = parseInt(route.params.id)
-    const client = clientsDB.value.find(c => c.id === clientId)
-    if (client) {
-      Object.assign(form, JSON.parse(JSON.stringify(client))) // Deep copy para edição
+    try {
+      const client = await customerService.getById(route.params.id)
+      if (client) {
+        Object.assign(form, client)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar cliente:', error)
+      alert('Erro ao carregar cliente.')
+      router.push('/clientes')
     }
   }
 })
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   loading.value = true
-  setTimeout(() => {
+  try {
     if (isEditing.value) {
-      const index = clientsDB.value.findIndex(c => c.id === form.id)
-      if (index !== -1) {
-        clientsDB.value[index] = { ...form } // Atualiza o cliente
-      }
+      await customerService.update(form.id, form)
       alert('Cliente atualizado com sucesso!')
     } else {
-      const newId = clientsDB.value.length > 0 ? Math.max(...clientsDB.value.map(c => c.id)) + 1 : 1
-      clientsDB.value.push({ ...form, id: newId, totalOrders: 0 }) // Adiciona novo cliente
+      await customerService.create(form)
       alert('Cliente cadastrado com sucesso!')
     }
-    loading.value = false
     router.push('/clientes')
-  }, 1000)
+  } catch (error) {
+    console.error('Erro ao salvar cliente:', error)
+    alert('Erro ao salvar cliente.')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

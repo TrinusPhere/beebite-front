@@ -1,24 +1,49 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Search, Edit2, Trash2, User, Phone, MapPin } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
-import { clientsDB } from '@/utils/mockData'
+import { customerService } from '@/services/customerService'
 
 const router = useRouter()
 const searchQuery = ref('')
-const clients = clientsDB.value
+const clients = ref([])
+const loading = ref(true)
+
+const fetchClients = async () => {
+  loading.value = true
+  try {
+    clients.value = await customerService.getAll()
+  } catch (error) {
+    console.error('Erro ao buscar clientes:', error)
+    alert('Erro ao carregar clientes. Tente novamente.')
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  fetchClients()
+})
 
 const filteredClients = computed(() => {
-  return clients.filter(c =>
+  if (!searchQuery.value) return clients.value
+  
+  return clients.value.filter(c =>
     c.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-    c.phone.includes(searchQuery.value)
+    (c.phone && c.phone.includes(searchQuery.value))
   )
 })
 
-const removeClient = (id) => {
+const removeClient = async (id) => {
   if (confirm('Tem certeza que deseja excluir este cliente?')) {
-    clients.value = clients.value.filter(item => item.id !== id)
+    try {
+      await customerService.delete(id)
+      clients.value = clients.value.filter(item => item.id !== id)
+    } catch (error) {
+      console.error('Erro ao excluir cliente:', error)
+      alert('Erro ao excluir cliente.')
+    }
   }
 }
 </script>
@@ -101,7 +126,10 @@ const removeClient = (id) => {
         </table>
       </div>
 
-      <div v-if="filteredClients.length === 0" class="py-12 text-center text-slate-400 text-sm font-medium">
+      <div v-if="loading" class="py-12 text-center text-slate-400 text-sm font-medium">
+        Carregando clientes...
+      </div>
+      <div v-else-if="filteredClients.length === 0" class="py-12 text-center text-slate-400 text-sm font-medium">
         Nenhum cliente encontrado.
       </div>
     </div>
