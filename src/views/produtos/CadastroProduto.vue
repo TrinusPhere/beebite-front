@@ -6,6 +6,7 @@ import BaseButton from '@/components/BaseButton.vue'
 import { productService } from '@/services/productService'
 import { ingredientService } from '@/services/ingredientService'
 import { modifierGroupService } from '@/services/modifierGroupService'
+import categoryService from '@/services/categoryService'
 
 const router = useRouter()
 const route = useRoute()
@@ -21,18 +22,40 @@ const availableIngredients = ref([])
 const modifierGroups = ref([])
 const availableCategories = ref([])
 const isCreatingNewCategory = ref(false)
+const newCategoryName = ref('')
 
 const handleCategoryChange = (e) => {
   if (e.target.value === 'NEW_CATEGORY_OPTION') {
     isCreatingNewCategory.value = true
-    form.category = ''
+    form.categoryId = ''
+  } else {
+    // Check for default modifiers
+    const selectedCat = availableCategories.value.find(c => c.id === e.target.value)
+    if (selectedCat && selectedCat.defaultModifierGroupIds && selectedCat.defaultModifierGroupIds.length > 0) {
+      if (confirm(`Esta categoria possui modificadores padrão. Deseja aplicar os adicionais padrão ao produto?`)) {
+        form.modifierGroupIds = [...new Set([...form.modifierGroupIds, ...selectedCat.defaultModifierGroupIds])]
+      }
+    }
+  }
+}
+
+const saveNewCategory = async () => {
+  if (!newCategoryName.value.trim()) return
+  try {
+    const created = await categoryService.createCategory({ name: newCategoryName.value.trim() })
+    availableCategories.value.push(created)
+    form.categoryId = created.id
+    isCreatingNewCategory.value = false
+    newCategoryName.value = ''
+  } catch (err) {
+    alert('Erro ao criar categoria')
   }
 }
 
 const form = reactive({
   id: null,
   name: '',
-  category: 'Hambúrgueres',
+  categoryId: '',
   price: 0,
   technicalSheet: [],
   modifierGroupIds: [],
@@ -43,16 +66,13 @@ onMounted(async () => {
   try {
     availableIngredients.value = await ingredientService.getAll()
     modifierGroups.value = await modifierGroupService.getAll()
-    availableCategories.value = await productService.getCategories()
+    availableCategories.value = await categoryService.getCategories()
 
     if (route.params.id) {
       isEditing.value = true
       const itemToEdit = await productService.getById(route.params.id)
       if (itemToEdit) {
         Object.assign(form, itemToEdit)
-        if (itemToEdit.category && !availableCategories.value.includes(itemToEdit.category)) {
-          availableCategories.value.push(itemToEdit.category)
-        }
       }
     }
   } catch (err) {
@@ -221,27 +241,34 @@ const handleSubmit = async () => {
               <!-- Select para categorias existentes -->
               <select 
                 v-if="!isCreatingNewCategory" 
-                v-model="form.category" 
+                v-model="form.categoryId" 
                 @change="handleCategoryChange"
                 class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20 font-medium text-slate-700"
               >
                 <option value="" disabled>Selecione uma categoria</option>
-                <option v-for="cat in availableCategories" :key="cat" :value="cat">{{ cat }}</option>
+                <option v-for="cat in availableCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
                 <option value="NEW_CATEGORY_OPTION" class="font-bold text-orange-600">➕ Nova categoria...</option>
               </select>
 
-              <!-- Input para nova categoria -->
               <div v-else class="flex gap-2">
                 <input 
-                  v-model="form.category" 
+                  v-model="newCategoryName" 
                   type="text" 
-                  required 
                   placeholder="Nome da nova categoria..." 
                   class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20 font-medium"
                   autofocus
+                  @keyup.enter="saveNewCategory"
                 >
                 <button 
-                  @click="isCreatingNewCategory = false; form.category = availableCategories[0] || 'Hambúrgueres'" 
+                  @click="saveNewCategory"
+                  type="button" 
+                  class="px-4 bg-orange-100 text-orange-600 hover:bg-orange-200 rounded-xl transition-all"
+                  title="Salvar"
+                >
+                  <Save :size="18" />
+                </button>
+                <button 
+                  @click="isCreatingNewCategory = false; form.categoryId = availableCategories[0]?.id || ''" 
                   type="button" 
                   class="px-4 bg-slate-100 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-xl transition-all"
                   title="Cancelar e voltar a selecionar"

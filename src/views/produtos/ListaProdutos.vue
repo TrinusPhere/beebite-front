@@ -3,18 +3,30 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Search, Edit2, Trash2, ShoppingBag, Layers, BarChart3 } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
-import { productService } from '@/services/productService'
+import categoryService from '@/services/categoryService'
+import { modifierGroupService } from '@/services/modifierGroupService'
 
 const router = useRouter()
 const searchQuery = ref('')
 const products = ref([])
 const availableCategories = ref([])
-const selectedCategory = ref('')
+const selectedCategoryId = ref('')
+const modifierGroups = ref([])
+
+// Configuração de Categoria
+const showCategorySettings = ref(false)
+const categorySettings = ref({
+  id: '',
+  name: '',
+  defaultModifierGroupIds: []
+})
+const savingCategory = ref(false)
 
 onMounted(async () => {
   try {
     products.value = await productService.getAll()
-    availableCategories.value = await productService.getCategories()
+    availableCategories.value = await categoryService.getCategories()
+    modifierGroups.value = await modifierGroupService.getAll()
   } catch (err) {
     console.error('Erro ao carregar produtos', err)
   }
@@ -23,8 +35,8 @@ onMounted(async () => {
 const filteredProducts = computed(() => {
   return products.value.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
-                          p.category.toLowerCase().includes(searchQuery.value.toLowerCase())
-    const matchesCategory = selectedCategory.value === '' || p.category === selectedCategory.value
+                          (p.categoryName && p.categoryName.toLowerCase().includes(searchQuery.value.toLowerCase()))
+    const matchesCategory = selectedCategoryId.value === '' || p.categoryId === selectedCategoryId.value
     return matchesSearch && matchesCategory
   })
 })
@@ -38,6 +50,58 @@ const removeProduct = async (id) => {
       console.error('Erro ao excluir produto', err)
       alert('Erro ao excluir produto.')
     }
+  }
+}
+
+const openCategorySettings = () => {
+  const cat = availableCategories.value.find(c => c.id === selectedCategoryId.value)
+  if (cat) {
+    categorySettings.value = {
+      id: cat.id,
+      name: cat.name,
+      defaultModifierGroupIds: cat.defaultModifierGroupIds ? [...cat.defaultModifierGroupIds] : []
+    }
+    showCategorySettings.value = true
+  }
+}
+
+const applyCategorySettings = async () => {
+  if (!confirm('Deseja salvar estas configurações? Para aplicar as opções em lote a todos os produtos já existentes, usaremos esta lista padrão.')) return
+  savingCategory.value = true
+  try {
+    await categoryService.updateCategory(categorySettings.value.id, {
+      name: categorySettings.value.name,
+      defaultModifierGroupIds: categorySettings.value.defaultModifierGroupIds
+    })
+    
+    // update in list
+    const index = availableCategories.value.findIndex(c => c.id === categorySettings.value.id)
+    if (index !== -1) {
+      availableCategories.value[index].defaultModifierGroupIds = [...categorySettings.value.defaultModifierGroupIds]
+    }
+    
+    showCategorySettings.value = false
+  } catch (err) {
+    alert('Erro ao salvar categoria')
+  } finally {
+    savingCategory.value = false
+  }
+}
+
+const applyModifiersToAllProducts = async () => {
+  if (!confirm('ATENÇÃO: Esta ação irá sobrescrever as configurações de modificadores de TODOS os produtos desta categoria para usar APENAS os itens selecionados aqui. Deseja continuar?')) return
+  savingCategory.value = true
+  try {
+    // We'll call the new bulk apply endpoint
+    await categoryService.bulkApplyModifiers(categorySettings.value.id)
+    alert('Modificadores aplicados com sucesso a todos os produtos da categoria!')
+    showCategorySettings.value = false
+    // Refresh products
+    products.value = await productService.getAll()
+  } catch (err) {
+    alert('Erro ao aplicar modificadores em lote')
+  } finally {
+    savingCategory.value = false
   }
 }
 </script>
@@ -68,10 +132,15 @@ const removeProduct = async (id) => {
             class="w-full bg-slate-50 border border-slate-200 text-sm pl-10 p-2.5 rounded-xl outline-none"
           >
         </div>
-        <select v-model="selectedCategory" class="bg-slate-50 border border-slate-200 text-sm px-4 py-2.5 rounded-xl outline-none font-medium text-slate-600">
-          <option value="">Todas as Categorias</option>
-          <option v-for="cat in availableCategories" :key="cat" :value="cat">{{ cat }}</option>
-        </select>
+        <div class="flex gap-2 items-center">
+          <select v-model="selectedCategoryId" class="bg-slate-50 border border-slate-200 text-sm px-4 py-2.5 rounded-xl outline-none font-medium text-slate-600">
+            <option value="">Todas as Categorias</option>
+            <option v-for="cat in availableCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+          </select>
+          <button v-if="selectedCategoryId" @click="openCategorySettings" class="p-2 text-slate-400 hover:text-orange-500 hover:bg-orange-50 rounded-xl transition-all" title="Configurar Categoria">
+            <Edit2 :size="18" />
+          </button>
+        </div>
       </div>
 
       <div class="overflow-x-auto">
@@ -97,7 +166,7 @@ const removeProduct = async (id) => {
               </td>
               <td class="px-6 py-4">
                 <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-1 rounded-md">
-                  {{ item.category }}
+                  {{ item.categoryName || 'S/ Categoria' }}
                 </span>
               </td>
               <td class="px-6 py-4 font-black text-slate-700 text-sm">
@@ -129,7 +198,42 @@ const removeProduct = async (id) => {
       </div>
 
       <div v-if="filteredProducts.length === 0" class="py-12 text-center text-slate-400 text-sm font-medium">
-        Nenhum produto cadastrado.
+        Nenhum produto encontrado.
+      </div>
+    </div>
+
+    <!-- Modal de Configuração de Categoria -->
+    <div v-if="showCategorySettings" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-3xl shadow-xl w-full max-w-lg">
+        <h3 class="text-xl font-bold text-slate-800 mb-2">Configurar Categoria</h3>
+        <p class="text-slate-500 text-sm mb-6">Defina os opcionais padrão para a categoria <span class="font-bold">{{ categorySettings.name }}</span>.</p>
+        
+        <div class="space-y-4 max-h-[50vh] overflow-y-auto mb-6 pr-2">
+          <label v-for="group in modifierGroups" :key="group.id" :class="[
+            'flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all',
+            categorySettings.defaultModifierGroupIds.includes(group.id) ? 'border-orange-500 bg-orange-50' : 'border-slate-200 hover:bg-slate-50'
+          ]">
+            <input type="checkbox" :value="group.id" v-model="categorySettings.defaultModifierGroupIds" class="form-checkbox text-orange-600 rounded">
+            <div class="flex-1">
+              <span class="font-bold text-slate-800 text-sm">{{ group.name }}</span>
+            </div>
+          </label>
+          <div v-if="modifierGroups.length === 0" class="text-slate-400 text-sm text-center">
+            Nenhum grupo cadastrado.
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-3">
+          <BaseButton variant="primary" :loading="savingCategory" @click="applyCategorySettings" class="w-full">
+            Salvar Opcionais Padrão
+          </BaseButton>
+          <button @click="applyModifiersToAllProducts" :disabled="savingCategory" class="w-full py-2.5 bg-orange-100 text-orange-600 font-bold rounded-xl text-sm hover:bg-orange-200 transition-colors">
+            Aplicar Opcionais em Lote aos Produtos Existentes
+          </button>
+          <BaseButton variant="secondary" @click="showCategorySettings = false" class="w-full">
+            Cancelar
+          </BaseButton>
+        </div>
       </div>
     </div>
   </div>
