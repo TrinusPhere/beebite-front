@@ -5,7 +5,7 @@ export const customerService = {
     const response = await api.get('/customers', {
       params: { search }
     })
-    return response.data
+    return response.data.content || response.data
   },
 
   getById: async (id) => {

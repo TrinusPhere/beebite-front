@@ -3,7 +3,7 @@ import api from './api'
 export const driverService = {
   getAll: async () => {
     const response = await api.get('/drivers')
-    return response.data
+    return response.data.content || response.data
   },
 
   getById: async (id) => {

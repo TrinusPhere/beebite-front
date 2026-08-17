@@ -3,7 +3,7 @@ import api from './api'
 export const additionalService = {
   getAll: async () => {
     const response = await api.get('/additionals')
-    return response.data
+    return response.data.content || response.data
   },
   create: async (data) => {
     const response = await api.post('/additionals', data)

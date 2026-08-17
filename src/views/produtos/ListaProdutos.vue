@@ -5,6 +5,7 @@ import { Plus, Search, Edit2, Trash2, ShoppingBag, Layers, BarChart3 } from 'luc
 import BaseButton from '@/components/BaseButton.vue'
 import categoryService from '@/services/categoryService'
 import { modifierGroupService } from '@/services/modifierGroupService'
+import { productService } from '@/services/productService'
 
 const router = useRouter()
 const searchQuery = ref('')
@@ -12,6 +13,11 @@ const products = ref([])
 const availableCategories = ref([])
 const selectedCategoryId = ref('')
 const modifierGroups = ref([])
+
+// Paginação
+const currentPage = ref(0)
+const totalPages = ref(1)
+const totalElements = ref(0)
 
 // Configuração de Categoria
 const showCategorySettings = ref(false)
@@ -22,13 +28,33 @@ const categorySettings = ref({
 })
 const savingCategory = ref(false)
 
+const loadProducts = async () => {
+  try {
+    const response = await productService.getAll(selectedCategoryId.value, currentPage.value)
+    products.value = response.content || []
+    currentPage.value = response.page || 0
+    totalPages.value = response.totalPages || 1
+    totalElements.value = response.totalElements || 0
+  } catch (err) {
+    console.error('Erro ao carregar produtos', err)
+    products.value = []
+  }
+}
+
+const changePage = async (pageIndex) => {
+  if (pageIndex >= 0 && pageIndex < totalPages.value) {
+    currentPage.value = pageIndex
+    await loadProducts()
+  }
+}
+
 onMounted(async () => {
   try {
-    products.value = await productService.getAll()
+    await loadProducts()
     availableCategories.value = await categoryService.getCategories()
     modifierGroups.value = await modifierGroupService.getAll()
   } catch (err) {
-    console.error('Erro ao carregar produtos', err)
+    console.error('Erro ao carregar categorias ou modificadores', err)
   }
 })
 
@@ -36,8 +62,7 @@ const filteredProducts = computed(() => {
   return products.value.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
                           (p.categoryName && p.categoryName.toLowerCase().includes(searchQuery.value.toLowerCase()))
-    const matchesCategory = selectedCategoryId.value === '' || p.categoryId === selectedCategoryId.value
-    return matchesSearch && matchesCategory
+    return matchesSearch
   })
 })
 
@@ -97,7 +122,7 @@ const applyModifiersToAllProducts = async () => {
     alert('Modificadores aplicados com sucesso a todos os produtos da categoria!')
     showCategorySettings.value = false
     // Refresh products
-    products.value = await productService.getAll()
+    await loadProducts()
   } catch (err) {
     alert('Erro ao aplicar modificadores em lote')
   } finally {
@@ -133,7 +158,7 @@ const applyModifiersToAllProducts = async () => {
           >
         </div>
         <div class="flex gap-2 items-center">
-          <select v-model="selectedCategoryId" class="bg-slate-50 border border-slate-200 text-sm px-4 py-2.5 rounded-xl outline-none font-medium text-slate-600">
+          <select v-model="selectedCategoryId" @change="currentPage = 0; loadProducts()" class="bg-slate-50 border border-slate-200 text-sm px-4 py-2.5 rounded-xl outline-none font-medium text-slate-600">
             <option value="">Todas as Categorias</option>
             <option v-for="cat in availableCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
           </select>
@@ -178,7 +203,7 @@ const applyModifiersToAllProducts = async () => {
                     R$ {{ (item.price - item.cost).toFixed(2) }}
                   </span>
                   <span class="text-[9px] font-bold text-slate-400">
-                    {{ (((item.price - item.cost) / item.price) * 100).toFixed(0) }}% margem
+                    {{ item.price > 0 ? (((item.price - item.cost) / item.price) * 100).toFixed(0) : 0 }}% margem
                   </span>
                 </div>
               </td>
@@ -199,6 +224,32 @@ const applyModifiersToAllProducts = async () => {
 
       <div v-if="filteredProducts.length === 0" class="py-12 text-center text-slate-400 text-sm font-medium">
         Nenhum produto encontrado.
+      </div>
+      
+      <!-- Controles de Paginação -->
+      <div v-if="totalPages > 1" class="flex items-center justify-between p-4 border-t border-slate-100 bg-slate-50">
+        <span class="text-xs font-medium text-slate-500">
+          Mostrando {{ filteredProducts.length }} itens de {{ totalElements }} (Página {{ currentPage + 1 }} de {{ totalPages }})
+        </span>
+        <div class="flex gap-2">
+          <button 
+            @click="changePage(currentPage - 1)" 
+            :disabled="currentPage === 0"
+            class="px-3 py-1.5 text-sm font-bold rounded-lg transition-colors border border-slate-200"
+            :class="currentPage === 0 ? 'text-slate-300 bg-slate-100 cursor-not-allowed' : 'text-slate-600 bg-white hover:bg-slate-50 hover:text-orange-600'"
+          >
+            Anterior
+          </button>
+          
+          <button 
+            @click="changePage(currentPage + 1)" 
+            :disabled="currentPage >= totalPages - 1"
+            class="px-3 py-1.5 text-sm font-bold rounded-lg transition-colors border border-slate-200"
+            :class="currentPage >= totalPages - 1 ? 'text-slate-300 bg-slate-100 cursor-not-allowed' : 'text-slate-600 bg-white hover:bg-slate-50 hover:text-orange-600'"
+          >
+            Próxima
+          </button>
+        </div>
       </div>
     </div>
 

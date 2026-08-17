@@ -388,7 +388,8 @@ onMounted(async () => {
   try {
     modifierGroupsDB.value = await modifierGroupService.getAll()
     additionalsDB.value = await additionalService.getAll()
-    productsDB.value = await productService.getAll()
+    const pResponse = await productService.getAll()
+    productsDB.value = pResponse.content || []
   } catch (err) {
     console.error('Erro ao carregar configurações:', err)
   }
