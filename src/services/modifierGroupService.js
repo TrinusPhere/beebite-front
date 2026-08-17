@@ -3,7 +3,7 @@ import api from './api'
 export const modifierGroupService = {
   getAll: async () => {
     const response = await api.get('/modifier-groups')
-    return response.data
+    return response.data.content || response.data
   },
   getById: async (id) => {
     const response = await api.get(`/modifier-groups/${id}`)

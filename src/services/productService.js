@@ -1,10 +1,11 @@
 import api from './api'
 
 export const productService = {
-  getAll: async (category) => {
-    const url = category ? `/products?category=${encodeURIComponent(category)}` : '/products'
+  getAll: async (category, page = 0, size = 20) => {
+    let url = `/products?page=${page}&size=${size}`
+    if (category) url += `&categoryId=${encodeURIComponent(category)}`
     const response = await api.get(url)
-    return response.data
+    return response.data; // Retorna PageResponse completo: {content, page, size, totalElements, totalPages}
   },
   getById: async (id) => {
     const response = await api.get(`/products/${id}`)

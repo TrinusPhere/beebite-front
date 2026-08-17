@@ -307,11 +307,11 @@ const loadingProducts = ref(true)
 const loadCatalog = async () => {
   loadingProducts.value = true
   try {
-    const [products, modGroups] = await Promise.all([
+    const [productsResponse, modGroups] = await Promise.all([
       productService.getAll(),
       modifierGroupService.getAll()
     ])
-    availableProducts.value = products
+    availableProducts.value = productsResponse.content || []
     allModifierGroups.value = modGroups
   } catch (error) {
     console.error('Erro ao carregar catálogo:', error)

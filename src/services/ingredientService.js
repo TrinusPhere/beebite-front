@@ -3,7 +3,7 @@ import api from './api'
 export const ingredientService = {
   getAll: async () => {
     const response = await api.get('/ingredients')
-    return response.data
+    return response.data.content || response.data
   },
   getById: async (id) => {
     const response = await api.get(`/ingredients/${id}`)
