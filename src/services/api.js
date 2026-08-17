@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { authState } from '@/utils/auth'
+import router from '@/router'
 
 const api = axios.create({
   baseURL: 'http://localhost:8080/api/v1',
@@ -28,10 +29,13 @@ api.interceptors.response.use(
     return response
   },
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Token expirado ou inválido
+    const isUnauthorized = error.response && (error.response.status === 401 || error.response.status === 403);
+    const isCorsAuthError = !error.response && error.message === 'Network Error' && localStorage.getItem('biteflow_jwt');
+
+    if (isUnauthorized || isCorsAuthError) {
+      // Token expirado ou inválido (ou bloqueado por CORS devido a 401 do Quarkus)
       authState.logout()
-      window.location.href = '/' // Redireciona para o login
+      router.push({ name: 'login' })
     }
     return Promise.reject(error)
   }

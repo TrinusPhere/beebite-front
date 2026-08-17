@@ -6,10 +6,32 @@ const JWT_KEY = 'biteflow_jwt'
 
 const loadCurrentUser = () => {
   const saved = localStorage.getItem(CURRENT_USER_KEY)
-  if (saved) {
-    return JSON.parse(saved)
+  const token = localStorage.getItem(JWT_KEY)
+  
+  if (saved && token) {
+    if (isTokenValid(token)) {
+      return JSON.parse(saved)
+    } else {
+      localStorage.removeItem(CURRENT_USER_KEY)
+      localStorage.removeItem(JWT_KEY)
+      return null
+    }
   }
   return null
+}
+
+function isTokenValid(token) {
+  if (!token) return false
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    // Check expiration (payload.exp is in seconds, Date.now() is in ms)
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      return false
+    }
+    return true
+  } catch (e) {
+    return false
+  }
 }
 
 export const authState = reactive({
@@ -39,6 +61,13 @@ export const authState = reactive({
   
   hasPermission(permission) {
     if (!this.currentUser) return false
+    
+    const token = localStorage.getItem(JWT_KEY)
+    if (!isTokenValid(token)) {
+      this.logout()
+      return false
+    }
+
     if (this.currentUser.role === 'ADMIN') return true
     return this.currentUser.permissions && this.currentUser.permissions.includes(permission)
   }
