@@ -8,5 +8,12 @@ export const authService = {
   getCurrentUser: async () => {
     const response = await api.get('/auth/me')
     return response.data
+  },
+  logout: async () => {
+    try {
+      await api.post('/auth/logout')
+    } catch (e) {
+      console.warn("Falha no logout da API", e)
+    }
   }
 }
