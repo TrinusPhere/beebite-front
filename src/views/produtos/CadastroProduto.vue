@@ -74,6 +74,14 @@ onMounted(async () => {
       if (itemToEdit) {
         Object.assign(form, itemToEdit)
       }
+    } else if (route.query.cloneId) {
+      isEditing.value = false
+      const itemToClone = await productService.getById(route.query.cloneId)
+      if (itemToClone) {
+        Object.assign(form, itemToClone)
+        form.id = null // Ensure it's treated as a new product
+        form.name = `${itemToClone.name} (Cópia)`
+      }
     }
   } catch (err) {
     console.error('Erro ao carregar dados', err)

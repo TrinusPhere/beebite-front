@@ -37,17 +37,26 @@
     <!-- ABA 1: Grupos de Modificadores                  -->
     <!-- ═══════════════════════════════════════════════ -->
     <div v-if="activeTab === 'grupos'" class="space-y-4">
-      <div class="flex items-center justify-between">
-        <p class="text-slate-500 text-sm">Grupos definem conjuntos de opções que aparecem no modal de customização. Um grupo pode ser de seleção única (radio) ou múltipla (checkbox).</p>
-        <button @click="openGroupModal(null)" class="flex items-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-orange-600 transition-all shadow-sm shadow-orange-500/20 hover:shadow-orange-500/40 shrink-0 ml-4">
-          <Plus :size="16" /> Novo Grupo
-        </button>
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <p class="text-slate-500 text-sm flex-1">Grupos definem conjuntos de opções que aparecem no modal de customização. Um grupo pode ser de seleção única (radio) ou múltipla (checkbox).</p>
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <input 
+            v-model="searchGroupQuery" 
+            @input="currentGroupPage = 1"
+            type="text" 
+            placeholder="Buscar grupo..." 
+            class="px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-orange-400 outline-none w-full sm:w-56"
+          />
+          <button @click="openGroupModal(null)" class="flex items-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-orange-600 transition-all shadow-sm shadow-orange-500/20 shrink-0">
+            <Plus :size="16" /> Novo Grupo
+          </button>
+        </div>
       </div>
 
       <!-- Cards de grupos -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div
-          v-for="group in modifierGroupsDB"
+          v-for="group in filteredAndPaginatedGroups.items"
           :key="group.id"
           class="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-all space-y-4"
         >
@@ -93,10 +102,31 @@
         </div>
       </div>
 
-      <div v-if="!modifierGroupsDB.length" class="text-center py-16 text-slate-400">
+      <div v-if="filteredAndPaginatedGroups.items.length === 0" class="text-center py-16 text-slate-400">
         <Layers :size="40" class="mx-auto mb-3 opacity-30" />
-        <p class="font-medium">Nenhum grupo cadastrado.</p>
-        <p class="text-sm mt-1">Clique em "Novo Grupo" para começar.</p>
+        <p class="font-medium">Nenhum grupo encontrado.</p>
+        <p v-if="modifierGroupsDB.length === 0" class="text-sm mt-1">Clique em "Novo Grupo" para começar.</p>
+      </div>
+
+      <!-- Pagination -->
+      <div v-if="filteredAndPaginatedGroups.totalPages > 1" class="flex items-center justify-center gap-2 mt-6">
+        <button 
+          @click="currentGroupPage--" 
+          :disabled="currentGroupPage === 1"
+          class="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-500 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+        >
+          Anterior
+        </button>
+        <span class="text-sm font-medium text-slate-600 px-2">
+          Página {{ currentGroupPage }} de {{ filteredAndPaginatedGroups.totalPages }}
+        </span>
+        <button 
+          @click="currentGroupPage++" 
+          :disabled="currentGroupPage === filteredAndPaginatedGroups.totalPages"
+          class="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-500 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+        >
+          Próxima
+        </button>
       </div>
     </div>
 
@@ -117,7 +147,7 @@
           <thead>
             <tr class="border-b border-slate-100 bg-slate-50">
               <th class="text-left px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest">Nome</th>
-              <th class="text-left px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest">Categoria</th>
+              <th class="text-left px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest">Tipo</th>
               <th class="text-left px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest">Preço</th>
               <th class="text-left px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest">Status</th>
               <th class="px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">Ações</th>
@@ -301,11 +331,38 @@
 
                 <!-- Opções do grupo -->
                 <div>
-                  <div class="flex items-center justify-between mb-2">
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                     <label class="text-xs font-bold text-slate-600 uppercase tracking-wider">Opções do Grupo</label>
-                    <button @click="addOption" class="text-xs font-bold text-orange-500 hover:text-orange-600 flex items-center gap-1">
-                      <Plus :size="12" /> Adicionar opção
-                    </button>
+                    <div class="flex items-center gap-3">
+                      <div class="flex gap-2">
+                        <!-- Importar Tipo Inteiro -->
+                        <select 
+                          class="text-xs font-medium bg-slate-50 border border-slate-200 text-slate-600 rounded-lg px-2 py-1.5 outline-none hover:border-slate-300 cursor-pointer"
+                          @change="(e) => importCategory(e.target.value, e)"
+                        >
+                          <option value="">📥 Importar por Tipo...</option>
+                          <option v-for="(adds, category) in additionalsByCategory" :key="category" :value="category">
+                            Todos do tipo: {{ category }} ({{ adds.length }} itens)
+                          </option>
+                        </select>
+                        
+                        <!-- Importar Item Único -->
+                        <select 
+                          class="text-xs font-medium bg-slate-50 border border-slate-200 text-slate-600 rounded-lg px-2 py-1.5 outline-none hover:border-slate-300 cursor-pointer"
+                          @change="(e) => importFromCatalog(e.target.value, e)"
+                        >
+                          <option value="">📥 Importar 1 Adicional...</option>
+                          <optgroup v-for="(adds, category) in additionalsByCategory" :key="category" :label="category">
+                            <option v-for="add in adds" :key="add.id" :value="add.id">
+                              {{ add.name }} (+R$ {{ add.price.toFixed(2) }})
+                            </option>
+                          </optgroup>
+                        </select>
+                      </div>
+                      <button @click="addOption" class="text-xs font-bold text-orange-500 hover:text-orange-600 flex items-center gap-1">
+                        <Plus :size="12" /> Opção Manual
+                      </button>
+                    </div>
                   </div>
                   <div class="space-y-2">
                     <div v-for="(opt, i) in groupForm.options" :key="i" class="flex items-center gap-2">
@@ -350,7 +407,7 @@
                   <input v-model="additionalForm.name" type="text" placeholder="Ex: Queijo Coalho" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-orange-400 outline-none" />
                 </div>
                 <div>
-                  <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Categoria</label>
+                  <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Tipo de Adicional</label>
                   <input v-model="additionalForm.category" type="text" placeholder="Ex: Queijos, Carnes..." class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-orange-400 outline-none" />
                 </div>
                 <div>
@@ -384,11 +441,45 @@ const modifierGroupsDB = ref([])
 const additionalsDB = ref([])
 const productsDB = ref([])
 
+// Pesquisa e Paginação de Grupos
+const searchGroupQuery = ref('')
+const currentGroupPage = ref(1)
+const groupsPerPage = 8
+
+const filteredAndPaginatedGroups = computed(() => {
+  let filtered = modifierGroupsDB.value
+  
+  if (searchGroupQuery.value.trim()) {
+    const q = searchGroupQuery.value.toLowerCase()
+    filtered = filtered.filter(g => g.name.toLowerCase().includes(q))
+  }
+  
+  const start = (currentGroupPage.value - 1) * groupsPerPage
+  const end = start + groupsPerPage
+  
+  return {
+    items: filtered.slice(start, end),
+    totalItems: filtered.length,
+    totalPages: Math.ceil(filtered.length / groupsPerPage) || 1
+  }
+})
+
+const additionalsByCategory = computed(() => {
+  const groups = {}
+  for (const add of additionalsDB.value) {
+    if (!add.active) continue
+    const cat = add.category || 'Outros'
+    if (!groups[cat]) groups[cat] = []
+    groups[cat].push(add)
+  }
+  return groups
+})
+
 onMounted(async () => {
   try {
     modifierGroupsDB.value = await modifierGroupService.getAll()
     additionalsDB.value = await additionalService.getAll()
-    const pResponse = await productService.getAll()
+    const pResponse = await productService.getAll(null, 0, 1000)
     productsDB.value = pResponse.content || []
   } catch (err) {
     console.error('Erro ao carregar configurações:', err)
@@ -449,6 +540,32 @@ const closeGroupModal = () => { showGroupModal.value = false }
 
 const addOption = () => { groupForm.value.options.push({ name: '', price: 0 }) }
 const removeOption = (i) => { groupForm.value.options.splice(i, 1) }
+
+const importFromCatalog = (addId, event) => {
+  if (!addId) return
+  const add = additionalsDB.value.find(a => a.id === addId)
+  if (add) {
+    // Adiciona o adicional como uma nova opção no grupo
+    groupForm.value.options.push({ name: add.name, price: add.price })
+  }
+  // Reseta o select
+  if (event?.target) event.target.value = ''
+}
+
+const importCategory = (categoryName, event) => {
+  if (!categoryName) return
+  const adds = additionalsByCategory.value[categoryName]
+  if (adds) {
+    adds.forEach(add => {
+      // Evita duplicidade exata de nome
+      const exists = groupForm.value.options.some(o => o.name === add.name)
+      if (!exists) {
+        groupForm.value.options.push({ name: add.name, price: add.price })
+      }
+    })
+  }
+  if (event?.target) event.target.value = ''
+}
 
 const saveGroup = async () => {
   if (!groupForm.value.name.trim()) { alert('Nome do grupo é obrigatório.'); return }
