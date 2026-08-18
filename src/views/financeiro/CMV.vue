@@ -4,6 +4,7 @@ import { Calculator, DollarSign, ShoppingBag, UtensilsCrossed, Search, AlertCirc
 import BaseButton from '@/components/BaseButton.vue'
 import { cmvService } from '@/services/financialService'
 import { productService } from '@/services/productService'
+import categoryService from '@/services/categoryService'
 
 const activeTab = ref('geral') // 'geral' ou 'por-produto'
 
@@ -53,6 +54,8 @@ const mapAlertColor = (level) => {
 // --- Aba 2: CMV por Produto ---
 const searchProduto = ref('')
 const allProducts = ref([])
+const allCategories = ref([])
+const selectedCategory = ref('')
 const produtoSelecionado = ref(null)
 const loadingProduto = ref(false)
 const cmvProdutoResult = ref(null)
@@ -60,19 +63,38 @@ const cmvProdutoResult = ref(null)
 const carregarProdutos = async () => {
   try {
     const data = await productService.getAll()
-    allProducts.value = data
+    allProducts.value = data.content || data // Adapting for both paged and unpaged responses
   } catch (error) {
     console.error('Erro ao carregar produtos:', error)
   }
 }
 
+const carregarCategorias = async () => {
+  try {
+    const data = await categoryService.getCategories()
+    allCategories.value = data.content || data
+  } catch (error) {
+    console.error('Erro ao carregar categorias:', error)
+  }
+}
+
 onMounted(() => {
   carregarProdutos()
+  carregarCategorias()
 })
 
 const produtosFiltradosCMV = computed(() => {
-  if (!searchProduto.value) return allProducts.value
-  return allProducts.value.filter(p => p.name.toLowerCase().includes(searchProduto.value.toLowerCase()))
+  let filtered = allProducts.value || []
+  
+  if (selectedCategory.value) {
+    filtered = filtered.filter(p => p.categoryId === selectedCategory.value || p.category?.id === selectedCategory.value || p.category === selectedCategory.value)
+  }
+  
+  if (searchProduto.value) {
+    filtered = filtered.filter(p => p.name.toLowerCase().includes(searchProduto.value.toLowerCase()))
+  }
+  
+  return filtered
 })
 
 const selecionarProduto = async (produto) => {
@@ -177,18 +199,36 @@ const selecionarProduto = async (produto) => {
         <ShoppingBag :size="16" /> CMV por Produto
       </div>
 
-      <div class="space-y-2">
-        <label class="text-xs font-bold text-slate-700 ml-1">Buscar Produto</label>
-        <div class="relative">
-          <Search :size="20" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            v-model="searchProduto"
-            type="text"
-            placeholder="Nome do produto..."
-            class="w-full bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20"
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-slate-700 ml-1">Filtrar por Categoria</label>
+          <select
+            v-model="selectedCategory"
+            class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20"
           >
+            <option value="">Todas as categorias</option>
+            <option v-for="cat in allCategories" :key="cat.id" :value="cat.id || cat.name">
+              {{ cat.name }}
+            </option>
+          </select>
         </div>
-        <div v-if="searchProduto && produtosFiltradosCMV.length > 0" class="bg-white border border-slate-200 rounded-xl shadow-md max-h-48 overflow-y-auto">
+
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-slate-700 ml-1">Buscar Produto</label>
+          <div class="relative">
+            <Search :size="20" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              v-model="searchProduto"
+              type="text"
+              placeholder="Nome do produto..."
+              class="w-full bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20"
+            >
+          </div>
+        </div>
+      </div>
+      
+      <div class="space-y-2">
+        <div v-if="searchProduto && produtosFiltradosCMV.length > 0" class="bg-white border border-slate-200 rounded-xl shadow-md max-h-48 overflow-y-auto mt-2">
           <button
             v-for="produto in produtosFiltradosCMV"
             :key="produto.id"
@@ -199,6 +239,17 @@ const selecionarProduto = async (produto) => {
           </button>
         </div>
         <p v-else-if="searchProduto && produtosFiltradosCMV.length === 0" class="text-slate-500 text-sm mt-2">Nenhum produto encontrado.</p>
+        <div v-else-if="selectedCategory && !searchProduto && produtosFiltradosCMV.length > 0" class="bg-white border border-slate-200 rounded-xl shadow-md max-h-48 overflow-y-auto mt-2">
+          <button
+            v-for="produto in produtosFiltradosCMV"
+            :key="produto.id"
+            @click="selecionarProduto(produto)"
+            class="w-full text-left p-3 hover:bg-slate-50 border-b border-slate-100 last:border-b-0"
+          >
+            {{ produto.name }}
+          </button>
+        </div>
+        <p v-else-if="selectedCategory && !searchProduto && produtosFiltradosCMV.length === 0" class="text-slate-500 text-sm mt-2">Nenhum produto encontrado nesta categoria.</p>
       </div>
 
       <div v-if="loadingProduto" class="pt-6 border-t border-slate-100 space-y-4">

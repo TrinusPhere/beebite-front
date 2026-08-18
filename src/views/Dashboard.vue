@@ -82,7 +82,7 @@ onMounted(() => {
         <div :class="['p-3 rounded-2xl transition-colors', stat.bg, stat.color]">
           <component :is="stat.icon" :size="24" />
         </div>
-        <span :class="[
+        <span v-if="stat.change" :class="[
           'flex items-center text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-wider mt-4',
           stat.change.startsWith('+') ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
         ]">

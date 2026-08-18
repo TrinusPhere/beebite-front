@@ -38,7 +38,7 @@ test.describe('Controle de CMV (Fase 5)', () => {
     await page.getByRole('button', { name: 'CMV por Produto' }).click();
 
     const searchInput = page.getByPlaceholder('Nome do produto...');
-    await searchInput.fill(''); 
+    await searchInput.fill('a'); 
     
     await page.waitForTimeout(1000);
     const firstProductBtn = page.locator('.max-h-48 button').first();
