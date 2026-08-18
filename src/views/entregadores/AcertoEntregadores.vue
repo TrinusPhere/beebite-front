@@ -1,10 +1,11 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { Bike } from 'lucide-vue-next'
-import { deliverySettlementsDB } from '@/utils/mockData' // Importar dados mockados
+import { settlementService } from '@/services/settlementService'
 
-// Mock Data para exemplificar a estrutura
 const period = ref('daily') // 'daily', 'weekly', 'monthly'
+const loading = ref(true)
+const report = ref({ entries: [], grandTotal: 0 })
 
 const periods = [
   { value: 'daily', label: 'Diário' },
@@ -12,11 +13,29 @@ const periods = [
   { value: 'monthly', label: 'Mensal' }
 ]
 
+const fetchReport = async () => {
+  try {
+    loading.value = true
+    const data = await settlementService.getSettlementReport(period.value)
+    report.value = data
+  } catch (error) {
+    console.error('Erro ao buscar acerto de entregadores:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
 const setPeriod = (newPeriod) => {
   period.value = newPeriod
 }
 
-const deliverySettlements = deliverySettlementsDB
+watch(period, () => {
+  fetchReport()
+})
+
+onMounted(() => {
+  fetchReport()
+})
 </script>
 
 <template>
@@ -71,26 +90,36 @@ const deliverySettlements = deliverySettlementsDB
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-50">
-            <tr v-for="(motoboy, index) in deliverySettlements[period]" :key="index" class="hover:bg-slate-50 transition-colors">
-              <td class="p-4 font-bold text-slate-800 text-sm">{{ motoboy.name }}</td>
-              <td class="p-4">
-                <span :class="[
-                  'px-2 py-1 text-[10px] font-black uppercase tracking-wider rounded-lg',
-                  motoboy.type === 'Fixo' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'
-                ]">
-                  {{ motoboy.type }}
-                </span>
-              </td>
-              <td class="p-4 font-medium text-slate-600 text-sm">{{ motoboy.deliveries }}</td>
-              <td class="p-4 font-medium text-slate-500 text-sm">{{ motoboy.feePerDelivery }}</td>
-              <td class="p-4 font-medium text-slate-500 text-sm">{{ motoboy.allowance }}</td>
-              <td class="p-4 font-black text-orange-600 text-sm">{{ motoboy.total }}</td>
+            <tr v-if="loading">
+              <td colspan="6" class="p-8 text-center text-slate-400 font-medium text-sm">Carregando dados...</td>
             </tr>
-            <tr v-if="deliverySettlements[period].length === 0">
-              <td colspan="6" class="p-8 text-center text-slate-400 font-medium text-sm">Nenhum dado encontrado para este período.</td>
-            </tr>
+            <template v-else>
+              <tr v-for="motoboy in report.entries" :key="motoboy.driverId" class="hover:bg-slate-50 transition-colors">
+                <td class="p-4 font-bold text-slate-800 text-sm">{{ motoboy.driverName }}</td>
+                <td class="p-4">
+                  <span :class="[
+                    'px-2 py-1 text-[10px] font-black uppercase tracking-wider rounded-lg',
+                    motoboy.driverType === 'FIXO' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'
+                  ]">
+                    {{ motoboy.driverType }}
+                  </span>
+                </td>
+                <td class="p-4 font-medium text-slate-600 text-sm">{{ motoboy.deliveries }}</td>
+                <td class="p-4 font-medium text-slate-500 text-sm">{{ new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(motoboy.feePerDelivery) }}</td>
+                <td class="p-4 font-medium text-slate-500 text-sm">{{ new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(motoboy.allowance) }}</td>
+                <td class="p-4 font-black text-orange-600 text-sm">{{ new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(motoboy.total) }}</td>
+              </tr>
+              <tr v-if="report.entries.length === 0">
+                <td colspan="6" class="p-8 text-center text-slate-400 font-medium text-sm">Nenhum dado encontrado para este período.</td>
+              </tr>
+            </template>
           </tbody>
         </table>
+      </div>
+      
+      <div v-if="!loading && report.entries.length > 0" class="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+        <span class="font-black text-slate-600 uppercase tracking-widest text-sm">Total Geral:</span>
+        <span class="text-xl font-black text-slate-800">{{ new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(report.grandTotal) }}</span>
       </div>
     </div>
   </div>

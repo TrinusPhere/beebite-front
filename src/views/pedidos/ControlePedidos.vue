@@ -615,7 +615,7 @@ const emitirNFe = (order) => {
                     <!-- Dropdown Menu -->
                     <transition enter-active-class="transition duration-100 ease-out" enter-from-class="transform scale-95 opacity-0" enter-to-class="transform scale-100 opacity-100" leave-active-class="transition duration-75 ease-in" leave-from-class="transform scale-100 opacity-100" leave-to-class="transform scale-95 opacity-0">
                       <div v-if="openMenuId === order.id" class="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1">
-                        <button @click.stop="editOrder(order.id)" class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                        <button v-if="['ANALISE', 'PREPARO'].includes(order.status)" @click.stop="editOrder(order.id)" class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
                           <Edit :size="14" class="text-blue-500" /> Editar
                         </button>
                         <button @click.stop="emitirNFe(order)" class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">

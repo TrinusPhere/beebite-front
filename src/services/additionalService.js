@@ -2,7 +2,8 @@ import api from './api'
 
 export const additionalService = {
   getAll: async () => {
-    const response = await api.get('/additionals')
+    // Busca até 1000 itens para suportar catálogos completos no frontend
+    const response = await api.get('/additionals?size=1000')
     return response.data.content || response.data
   },
   create: async (data) => {

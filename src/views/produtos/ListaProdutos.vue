@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search, Edit2, Trash2, ShoppingBag, Layers, BarChart3 } from 'lucide-vue-next'
+import { Plus, Search, Edit2, Trash2, ShoppingBag, Layers, BarChart3, Copy } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
 import categoryService from '@/services/categoryService'
 import { modifierGroupService } from '@/services/modifierGroupService'
@@ -54,29 +54,9 @@ onMounted(async () => {
     availableCategories.value = await categoryService.getCategories()
     modifierGroups.value = await modifierGroupService.getAll()
   } catch (err) {
-    console.error('Erro ao carregar categorias ou modificadores', err)
+    console.error('Erro ao carregar categorias ou produtos', err)
   }
 })
-
-const filteredProducts = computed(() => {
-  return products.value.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
-                          (p.categoryName && p.categoryName.toLowerCase().includes(searchQuery.value.toLowerCase()))
-    return matchesSearch
-  })
-})
-
-const removeProduct = async (id) => {
-  if (confirm('Tem certeza que deseja excluir este produto?')) {
-    try {
-      await productService.delete(id)
-      products.value = products.value.filter(item => item.id !== id)
-    } catch (err) {
-      console.error('Erro ao excluir produto', err)
-      alert('Erro ao excluir produto.')
-    }
-  }
-}
 
 const openCategorySettings = () => {
   const cat = availableCategories.value.find(c => c.id === selectedCategoryId.value)
@@ -129,6 +109,28 @@ const applyModifiersToAllProducts = async () => {
     savingCategory.value = false
   }
 }
+
+const filteredProducts = computed(() => {
+  return products.value.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
+                          (p.categoryName && p.categoryName.toLowerCase().includes(searchQuery.value.toLowerCase()))
+    return matchesSearch
+  })
+})
+
+const removeProduct = async (id) => {
+  if (confirm('Tem certeza que deseja excluir este produto?')) {
+    try {
+      await productService.delete(id)
+      products.value = products.value.filter(item => item.id !== id)
+    } catch (err) {
+      console.error('Erro ao excluir produto', err)
+      alert('Erro ao excluir produto.')
+    }
+  }
+}
+
+
 </script>
 
 <template>
@@ -209,7 +211,10 @@ const applyModifiersToAllProducts = async () => {
               </td>
               <td class="px-6 py-4 text-right">
                 <div class="flex justify-end gap-2">
-                  <button @click="router.push(`/produtos/editar/${item.id}`)" class="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all">
+                  <button @click="router.push(`/produtos/novo?cloneId=${item.id}`)" class="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all" title="Duplicar Produto">
+                    <Copy :size="16" />
+                  </button>
+                  <button @click="router.push(`/produtos/editar/${item.id}`)" class="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="Editar Produto">
                     <Edit2 :size="16" />
                   </button>
                   <button @click="removeProduct(item.id)" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">

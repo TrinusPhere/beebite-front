@@ -3,7 +3,7 @@ import { reactive, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Save, X, Bike, ChevronLeft } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
-import { motoboysDB } from '@/utils/mockData' // Importar motoboysDB
+import { driverService } from '@/services/driverService'
 
 const router = useRouter()
 const route = useRoute()
@@ -14,42 +14,62 @@ const form = reactive({
   id: null,
   name: '',
   phone: '',
-  status: 'Ativo',
+  status: 'ATIVO',
   isFixed: false,
   isDaily: false,
-  allowance: '',
+  allowance: 0,
   hasFixedDeliveryValue: false,
-  fixedDeliveryValue: ''
+  fixedDeliveryValue: 0
 })
 
-onMounted(() => {
+onMounted(async () => {
   if (route.params.id) {
     isEditing.value = true
-    const motoboyId = parseInt(route.params.id)
-    const motoboy = motoboysDB.value.find(m => m.id === motoboyId)
-    if (motoboy) {
-      Object.assign(form, JSON.parse(JSON.stringify(motoboy))) // Deep copy para edição
+    const motoboyId = route.params.id
+    try {
+      loading.value = true
+      const motoboy = await driverService.getById(motoboyId)
+      if (motoboy) {
+        Object.assign(form, {
+          ...motoboy,
+          status: motoboy.status?.toUpperCase() || 'ATIVO',
+          allowance: motoboy.allowance || 0,
+          fixedDeliveryValue: motoboy.fixedDeliveryValue || 0
+        })
+      }
+    } catch (error) {
+      console.error('Erro ao buscar entregador:', error)
+      alert('Entregador não encontrado.')
+      router.push('/entregadores')
+    } finally {
+      loading.value = false
     }
   }
 })
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   loading.value = true
-  setTimeout(() => {
+  try {
+    const payload = {
+      ...form,
+      allowance: Number(form.allowance),
+      fixedDeliveryValue: Number(form.fixedDeliveryValue)
+    }
+    
     if (isEditing.value) {
-      const index = motoboysDB.value.findIndex(m => m.id === form.id)
-      if (index !== -1) {
-        motoboysDB.value[index] = { ...form } // Atualiza o motoboy
-      }
+      await driverService.update(form.id, payload)
       alert('Entregador atualizado com sucesso!')
     } else {
-      const newId = motoboysDB.value.length > 0 ? Math.max(...motoboysDB.value.map(m => m.id)) + 1 : 1
-      motoboysDB.value.push({ ...form, id: newId, totalDeliveries: 0 }) // Adiciona novo motoboy
+      await driverService.create(payload)
       alert('Entregador cadastrado com sucesso!')
     }
-    loading.value = false
     router.push('/entregadores')
-  }, 1000)
+  } catch (error) {
+    console.error('Erro ao salvar entregador:', error)
+    alert('Erro ao salvar entregador.')
+  } finally {
+    loading.value = false
+  }
 }
 
 const handleCancel = () => {
@@ -76,7 +96,7 @@ const handleCancel = () => {
       </div>
       <div v-if="isEditing" :class="[
         'px-4 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border shadow-sm',
-        form.status === 'Ativo' ? 'bg-emerald-100 text-emerald-600 border-emerald-200' : 'bg-red-100 text-red-600 border-red-200'
+        form.status === 'ATIVO' ? 'bg-emerald-100 text-emerald-600 border-emerald-200' : 'bg-red-100 text-red-600 border-red-200'
       ]">
         {{ form.status }}
       </div>
@@ -101,8 +121,8 @@ const handleCancel = () => {
             <div class="space-y-1">
               <label class="text-xs font-bold text-slate-700 ml-1">Status</label>
               <select v-model="form.status" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20">
-                <option value="Ativo">Ativo</option>
-                <option value="Inativo">Inativo</option>
+                <option value="ATIVO">Ativo</option>
+                <option value="INATIVO">Inativo</option>
               </select>
             </div>
             

@@ -1,15 +1,30 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Search, Edit2, Trash2, Bike, CheckCircle2, XCircle } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
-import { motoboysDB } from '@/utils/mockData' // Importar motoboysDB
+import { driverService } from '@/services/driverService'
 
 const router = useRouter()
 const searchQuery = ref('')
+const motoboys = ref([])
+const loading = ref(true)
 
-// Usar dados mockados do mockData.js
-const motoboys = motoboysDB
+const fetchDrivers = async () => {
+  try {
+    loading.value = true
+    const data = await driverService.getAll()
+    motoboys.value = data
+  } catch (error) {
+    console.error('Erro ao buscar entregadores:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  fetchDrivers()
+})
 
 const filteredMotoboys = computed(() => {
   return motoboys.value.filter(m =>
@@ -18,11 +33,14 @@ const filteredMotoboys = computed(() => {
   )
 })
 
-const removeMotoboy = (id) => {
+const removeMotoboy = async (id) => {
   if (confirm('Tem certeza que deseja excluir este entregador?')) {
-    const index = motoboys.value.findIndex(item => item.id === id)
-    if (index !== -1) {
-      motoboys.value.splice(index, 1)
+    try {
+      await driverService.delete(id)
+      motoboys.value = motoboys.value.filter(item => item.id !== id)
+    } catch (error) {
+      console.error('Erro ao deletar entregador:', error)
+      alert('Erro ao excluir entregador.')
     }
   }
 }
@@ -88,9 +106,9 @@ const removeMotoboy = (id) => {
               <td class="px-6 py-4 text-center">
                 <span :class="[
                   'px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter',
-                  item.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                  item.status === 'ATIVO' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
                 ]">
-                  <CheckCircle2 :size="12" v-if="item.status === 'Ativo'" class="inline-block mr-1" />
+                  <CheckCircle2 :size="12" v-if="item.status === 'ATIVO'" class="inline-block mr-1" />
                   <XCircle :size="12" v-else class="inline-block mr-1" />
                   {{ item.status }}
                 </span>

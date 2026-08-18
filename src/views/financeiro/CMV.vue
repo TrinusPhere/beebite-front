@@ -1,8 +1,10 @@
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { Calculator, DollarSign, ShoppingBag, UtensilsCrossed, Search, AlertCircle } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
-import { financialRecordsDB, productsDB, ingredientsDB } from '@/utils/mockData'
+import { cmvService } from '@/services/financialService'
+import { productService } from '@/services/productService'
+import categoryService from '@/services/categoryService'
 
 const activeTab = ref('geral') // 'geral' ou 'por-produto'
 
@@ -15,72 +17,99 @@ const cmvGeralForm = reactive({
   estoqueFinal: 0,
 })
 
-const faturamentoBruto = computed(() => {
-  const inicio = cmvGeralForm.dataInicio ? new Date(cmvGeralForm.dataInicio) : null
-  const fim = cmvGeralForm.dataFim ? new Date(cmvGeralForm.dataFim) : null
+const cmvGeralResult = ref(null)
+const loadingGeral = ref(false)
 
-  return financialRecordsDB.value.reduce((sum, record) => {
-    const recordDate = new Date(record.date)
-    if ((!inicio || recordDate >= inicio) && (!fim || recordDate <= fim)) {
-      return sum + record.totalValue
+const calcularCmvGeral = async () => {
+  if (!cmvGeralForm.dataInicio || !cmvGeralForm.dataFim) {
+    alert('Preencha a data de início e fim.')
+    return
+  }
+
+  loadingGeral.value = true
+  try {
+    const payload = {
+      startDate: new Date(cmvGeralForm.dataInicio).getTime(),
+      endDate: new Date(cmvGeralForm.dataFim).getTime(),
+      initialStock: cmvGeralForm.estoqueInicial,
+      purchasesInPeriod: cmvGeralForm.comprasPeriodo,
+      finalStock: cmvGeralForm.estoqueFinal
     }
-    return sum
-  }, 0)
-})
+    const result = await cmvService.getGeneralCmv(payload)
+    cmvGeralResult.value = result
+  } catch (error) {
+    console.error('Erro ao calcular CMV Geral:', error)
+    alert('Erro ao calcular CMV Geral.')
+  } finally {
+    loadingGeral.value = false
+  }
+}
 
-const cmvGeralCalculado = computed(() => {
-  const { estoqueInicial, comprasPeriodo, estoqueFinal } = cmvGeralForm
-  return estoqueInicial + comprasPeriodo - estoqueFinal
-})
-
-const cmvGeralPercentual = computed(() => {
-  if (faturamentoBruto.value <= 0) return 0
-  return (cmvGeralCalculado.value / faturamentoBruto.value) * 100
-})
-
-const cmvGeralAlerta = computed(() => {
-  if (cmvGeralPercentual.value < 30) return 'verde'
-  if (cmvGeralPercentual.value >= 30 && cmvGeralPercentual.value <= 35) return 'amarelo'
-  return 'vermelho'
-})
+const mapAlertColor = (level) => {
+  if (level === 'GREEN') return 'text-emerald-600'
+  if (level === 'YELLOW') return 'text-orange-600'
+  return 'text-red-600'
+}
 
 // --- Aba 2: CMV por Produto ---
 const searchProduto = ref('')
+const allProducts = ref([])
+const allCategories = ref([])
+const selectedCategory = ref('')
 const produtoSelecionado = ref(null)
+const loadingProduto = ref(false)
+const cmvProdutoResult = ref(null)
 
-const produtosFiltradosCMV = computed(() => {
-  if (!searchProduto.value) return productsDB.value
-  return productsDB.value.filter(p => p.name.toLowerCase().includes(searchProduto.value.toLowerCase()))
-})
-
-const selecionarProduto = (produto) => {
-  produtoSelecionado.value = produto
+const carregarProdutos = async () => {
+  try {
+    const data = await productService.getAll()
+    allProducts.value = data.content || data // Adapting for both paged and unpaged responses
+  } catch (error) {
+    console.error('Erro ao carregar produtos:', error)
+  }
 }
 
-const custoTotalProducao = computed(() => {
-  if (!produtoSelecionado.value || !produtoSelecionado.value.technicalSheet) return 0
-  return produtoSelecionado.value.technicalSheet.reduce((acc, item) => {
-    const ingredient = ingredientsDB.value.find(ing => ing.id === item.id)
-    if (!ingredient) return acc
+const carregarCategorias = async () => {
+  try {
+    const data = await categoryService.getCategories()
+    allCategories.value = data.content || data
+  } catch (error) {
+    console.error('Erro ao carregar categorias:', error)
+  }
+}
 
-    // Assumindo que item.cost é o custo por item.unit e item.quantity é a quantidade nessa unidade.
-    // Se precisar de conversão (ex: gramas para kg), isso deve ser feito na quantity ou no cost antes de adicionar à technicalSheet.
-    return acc + (ingredient.costPrice * item.quantity)
-  }, 0)
+onMounted(() => {
+  carregarProdutos()
+  carregarCategorias()
 })
 
-const margemContribuicao = computed(() => {
-  if (!produtoSelecionado.value) return 0
-  return produtoSelecionado.value.price - custoTotalProducao.value
+const produtosFiltradosCMV = computed(() => {
+  let filtered = allProducts.value || []
+  
+  if (selectedCategory.value) {
+    filtered = filtered.filter(p => p.categoryId === selectedCategory.value || p.category?.id === selectedCategory.value || p.category === selectedCategory.value)
+  }
+  
+  if (searchProduto.value) {
+    filtered = filtered.filter(p => p.name.toLowerCase().includes(searchProduto.value.toLowerCase()))
+  }
+  
+  return filtered
 })
 
-const lucroBruto = computed(() => margemContribuicao.value) // Simplificado para este contexto
-
-const cmvUnitarioPercentual = computed(() => {
-  if (!produtoSelecionado.value || produtoSelecionado.value.price <= 0) return 0
-  return (custoTotalProducao.value / produtoSelecionado.value.price) * 100
-})
-
+const selecionarProduto = async (produto) => {
+  produtoSelecionado.value = produto
+  loadingProduto.value = true
+  cmvProdutoResult.value = null
+  try {
+    const result = await cmvService.getProductCmv(produto.id)
+    cmvProdutoResult.value = result
+  } catch (error) {
+    console.error('Erro ao calcular CMV do produto:', error)
+  } finally {
+    loadingProduto.value = false
+  }
+}
 </script>
 
 <template>
@@ -110,8 +139,13 @@ const cmvUnitarioPercentual = computed(() => {
 
     <!-- Conteúdo da Aba 1: CMV Geral -->
     <div v-if="activeTab === 'geral'" class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
-      <div class="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest">
-        <Calculator :size="16" /> Cálculo de CMV Geral
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest">
+          <Calculator :size="16" /> Cálculo de CMV Geral
+        </div>
+        <BaseButton variant="primary" @click="calcularCmvGeral" :disabled="loadingGeral">
+          {{ loadingGeral ? 'Calculando...' : 'Calcular CMV' }}
+        </BaseButton>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -137,25 +171,23 @@ const cmvUnitarioPercentual = computed(() => {
         </div>
       </div>
 
-      <div class="pt-6 border-t border-slate-100 space-y-4">
+      <div v-if="cmvGeralResult" class="pt-6 border-t border-slate-100 space-y-4">
         <h3 class="text-lg font-bold text-slate-800">Resultados</h3>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
             <p class="text-xs font-bold text-slate-500 uppercase">Faturamento Bruto</p>
-            <p class="text-xl font-black text-orange-600">R$ {{ faturamentoBruto.toFixed(2) }}</p>
+            <p class="text-xl font-black text-orange-600">{{ new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cmvGeralResult.grossRevenue) }}</p>
           </div>
           <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
             <p class="text-xs font-bold text-slate-500 uppercase">CMV Calculado</p>
-            <p class="text-xl font-black text-slate-800">R$ {{ cmvGeralCalculado.toFixed(2) }}</p>
+            <p class="text-xl font-black text-slate-800">{{ new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cmvGeralResult.cmvValue) }}</p>
           </div>
           <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
             <p class="text-xs font-bold text-slate-500 uppercase">CMV em %</p>
-            <p :class="['text-xl font-black', {
-              'text-emerald-600': cmvGeralAlerta === 'verde',
-              'text-orange-600': cmvGeralAlerta === 'amarelo',
-              'text-red-600': cmvGeralAlerta === 'vermelho',
-            }]">{{ cmvGeralPercentual.toFixed(2) }}%</p>
+            <p :class="['text-xl font-black', mapAlertColor(cmvGeralResult.alertLevel)]">
+              {{ cmvGeralResult.cmvPercentage.toFixed(2) }}%
+            </p>
           </div>
         </div>
       </div>
@@ -167,32 +199,64 @@ const cmvUnitarioPercentual = computed(() => {
         <ShoppingBag :size="16" /> CMV por Produto
       </div>
 
-      <div class="space-y-2">
-        <label class="text-xs font-bold text-slate-700 ml-1">Buscar Produto</label>
-        <div class="relative">
-          <Search :size="20" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            v-model="searchProduto"
-            type="text"
-            placeholder="Nome do produto..."
-            class="w-full bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20"
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-slate-700 ml-1">Filtrar por Categoria</label>
+          <select
+            v-model="selectedCategory"
+            class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20"
           >
+            <option value="">Todas as categorias</option>
+            <option v-for="cat in allCategories" :key="cat.id" :value="cat.id || cat.name">
+              {{ cat.name }}
+            </option>
+          </select>
         </div>
-        <div v-if="searchProduto && produtosFiltradosCMV.length > 0" class="bg-white border border-slate-200 rounded-xl shadow-md max-h-48 overflow-y-auto">
+
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-slate-700 ml-1">Buscar Produto</label>
+          <div class="relative">
+            <Search :size="20" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              v-model="searchProduto"
+              type="text"
+              placeholder="Nome do produto..."
+              class="w-full bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20"
+            >
+          </div>
+        </div>
+      </div>
+      
+      <div class="space-y-2">
+        <div v-if="searchProduto && produtosFiltradosCMV.length > 0" class="bg-white border border-slate-200 rounded-xl shadow-md max-h-48 overflow-y-auto mt-2">
           <button
             v-for="produto in produtosFiltradosCMV"
             :key="produto.id"
             @click="selecionarProduto(produto)"
             class="w-full text-left p-3 hover:bg-slate-50 border-b border-slate-100 last:border-b-0"
           >
-            {{ produto.name }} ({{ produto.category }})
+            {{ produto.name }} ({{ produto.category?.name || produto.category }})
           </button>
         </div>
         <p v-else-if="searchProduto && produtosFiltradosCMV.length === 0" class="text-slate-500 text-sm mt-2">Nenhum produto encontrado.</p>
+        <div v-else-if="selectedCategory && !searchProduto && produtosFiltradosCMV.length > 0" class="bg-white border border-slate-200 rounded-xl shadow-md max-h-48 overflow-y-auto mt-2">
+          <button
+            v-for="produto in produtosFiltradosCMV"
+            :key="produto.id"
+            @click="selecionarProduto(produto)"
+            class="w-full text-left p-3 hover:bg-slate-50 border-b border-slate-100 last:border-b-0"
+          >
+            {{ produto.name }}
+          </button>
+        </div>
+        <p v-else-if="selectedCategory && !searchProduto && produtosFiltradosCMV.length === 0" class="text-slate-500 text-sm mt-2">Nenhum produto encontrado nesta categoria.</p>
       </div>
 
-      <div v-if="produtoSelecionado" class="pt-6 border-t border-slate-100 space-y-4">
-        <h3 class="text-lg font-bold text-slate-800">Ficha Técnica de {{ produtoSelecionado.name }}</h3>
+      <div v-if="loadingProduto" class="pt-6 border-t border-slate-100 space-y-4">
+        <p class="text-center text-slate-400 font-medium text-sm">Carregando ficha técnica...</p>
+      </div>
+      <div v-else-if="cmvProdutoResult" class="pt-6 border-t border-slate-100 space-y-4">
+        <h3 class="text-lg font-bold text-slate-800">Ficha Técnica de {{ cmvProdutoResult.productName }}</h3>
         <div class="overflow-x-auto">
           <table class="w-full text-left">
             <thead>
@@ -204,15 +268,15 @@ const cmvUnitarioPercentual = computed(() => {
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-50">
-              <tr v-for="(item, index) in produtoSelecionado.technicalSheet" :key="index">
+              <tr v-for="(item, index) in cmvProdutoResult.ingredients" :key="index">
                 <td class="px-4 py-2 text-sm font-medium text-slate-700">{{ item.name }}</td>
                 <td class="px-4 py-2 text-center text-sm text-slate-600">{{ item.quantity }}</td>
                 <td class="px-4 py-2 text-sm text-slate-600">{{ item.unit }}</td>
                 <td class="px-4 py-2 text-right text-sm text-slate-600">
-                  R$ {{ (ingredientsDB.value.find(ing => ing.id === item.id)?.costPrice * item.quantity || 0).toFixed(2) }}
+                  {{ new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.proportionalCost) }}
                 </td>
               </tr>
-              <tr v-if="produtoSelecionado.technicalSheet.length === 0">
+              <tr v-if="!cmvProdutoResult.ingredients || cmvProdutoResult.ingredients.length === 0">
                 <td colspan="4" class="text-center py-4 text-slate-500 text-sm">Nenhum insumo na ficha técnica.</td>
               </tr>
             </tbody>
@@ -222,23 +286,21 @@ const cmvUnitarioPercentual = computed(() => {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
           <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
             <p class="text-xs font-bold text-slate-500 uppercase">Preço de Venda</p>
-            <p class="text-xl font-black text-orange-600">R$ {{ produtoSelecionado.price.toFixed(2) }}</p>
+            <p class="text-xl font-black text-orange-600">{{ new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cmvProdutoResult.sellingPrice) }}</p>
           </div>
           <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
             <p class="text-xs font-bold text-slate-500 uppercase">Custo Total de Produção</p>
-            <p class="text-xl font-black text-slate-800">R$ {{ custoTotalProducao.toFixed(2) }}</p>
+            <p class="text-xl font-black text-slate-800">{{ new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cmvProdutoResult.productionCost) }}</p>
           </div>
           <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
             <p class="text-xs font-bold text-slate-500 uppercase">Margem de Contribuição</p>
-            <p class="text-xl font-black text-emerald-600">R$ {{ margemContribuicao.toFixed(2) }}</p>
+            <p class="text-xl font-black text-emerald-600">{{ new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cmvProdutoResult.contributionMargin) }}</p>
           </div>
           <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
             <p class="text-xs font-bold text-slate-500 uppercase">CMV Unitário em %</p>
-            <p :class="['text-xl font-black', {
-              'text-emerald-600': cmvUnitarioPercentual < 30,
-              'text-orange-600': cmvUnitarioPercentual >= 30 && cmvUnitarioPercentual <= 35,
-              'text-red-600': cmvUnitarioPercentual > 35,
-            }]">{{ cmvUnitarioPercentual.toFixed(2) }}%</p>
+            <p :class="['text-xl font-black', mapAlertColor(cmvProdutoResult.alertLevel)]">
+              {{ cmvProdutoResult.cmvPercentage.toFixed(2) }}%
+            </p>
           </div>
         </div>
       </div>

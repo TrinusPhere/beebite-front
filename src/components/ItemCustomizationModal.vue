@@ -177,24 +177,24 @@
                   <div class="space-y-1.5">
                     <label
                       v-for="ingredient in removableIngredients"
-                      :key="ingredient.id"
+                      :key="ingredient.ingredientId || ingredient.id"
                       :class="[
                         'flex items-center gap-2.5 px-3 py-2 rounded-xl border-2 cursor-pointer transition-all text-xs',
-                        selectedRemovals.includes(ingredient.id)
+                        selectedRemovals.includes(ingredient.ingredientId || ingredient.id)
                           ? 'border-red-400 bg-red-50'
                           : 'border-slate-200 bg-white hover:border-red-200 hover:bg-red-50/40'
                       ]"
                     >
-                      <input type="checkbox" :value="ingredient.id" v-model="selectedRemovals" class="hidden" />
+                      <input type="checkbox" :value="ingredient.ingredientId || ingredient.id" v-model="selectedRemovals" class="hidden" />
                       <div :class="[
                         'w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0',
-                        selectedRemovals.includes(ingredient.id) ? 'border-red-500 bg-red-500' : 'border-slate-300'
+                        selectedRemovals.includes(ingredient.ingredientId || ingredient.id) ? 'border-red-500 bg-red-500' : 'border-slate-300'
                       ]">
-                        <X v-if="selectedRemovals.includes(ingredient.id)" :size="9" class="text-white" />
+                        <X v-if="selectedRemovals.includes(ingredient.ingredientId || ingredient.id)" :size="9" class="text-white" />
                       </div>
                       <span :class="[
                         'font-semibold flex-1 transition-all',
-                        selectedRemovals.includes(ingredient.id) ? 'text-red-500 line-through' : 'text-slate-600'
+                        selectedRemovals.includes(ingredient.ingredientId || ingredient.id) ? 'text-red-500 line-through' : 'text-slate-600'
                       ]">
                         Sem {{ ingredient.name }}
                       </span>
@@ -272,6 +272,7 @@ import { X, Check, ShoppingBag, UtensilsCrossed, AlertCircle, Plus, Minus, Hash 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   product: { type: Object, default: null },
+  initialItem: { type: Object, default: null },
   allModifierGroups: { type: Array, default: () => [] },
 })
 
@@ -285,15 +286,38 @@ const validationErrors = ref({})
 const quantity = ref(1)
 const observation = ref('')
 
-// Reset estado ao abrir o modal com um novo produto
+// Reset estado ao abrir o modal com um novo produto ou item a editar
 watch(() => props.modelValue, (isOpen) => {
   if (isOpen) {
-    selectedRadio.value = {}
-    selectedCheckboxes.value = {}
-    selectedRemovals.value = []
+    if (props.initialItem) {
+      quantity.value = props.initialItem.quantity || 1
+      observation.value = props.initialItem.observation || ''
+      selectedRemovals.value = (props.initialItem.removals || []).map(r => r.id || r.ingredientId)
+      
+      const newRadio = {}
+      const newCheckboxes = {}
+      ;(props.initialItem.modifiers || []).forEach(mod => {
+        const group = activeModifierGroups.value.find(g => g.id === mod.groupId) || props.allModifierGroups.find(g => g.id === mod.groupId)
+        if (group) {
+          const type = group.type?.toLowerCase() || 'radio'
+          if (type === 'radio') {
+            newRadio[mod.groupId] = mod.optionId
+          } else if (type === 'checkbox') {
+            if (!newCheckboxes[mod.groupId]) newCheckboxes[mod.groupId] = []
+            newCheckboxes[mod.groupId].push(mod.optionId)
+          }
+        }
+      })
+      selectedRadio.value = newRadio
+      selectedCheckboxes.value = newCheckboxes
+    } else {
+      selectedRadio.value = {}
+      selectedCheckboxes.value = {}
+      selectedRemovals.value = []
+      quantity.value = 1
+      observation.value = ''
+    }
     validationErrors.value = {}
-    quantity.value = 1
-    observation.value = ''
   }
 })
 
@@ -312,7 +336,8 @@ const activeModifierGroups = computed(() => {
 // ── Ingredientes removíveis deste produto ──
 const removableIngredients = computed(() => {
   if (!props.product?.technicalSheet?.length || !props.product?.removableItems?.length) return []
-  return props.product.technicalSheet.filter(i => props.product.removableItems.includes(i.id))
+  const removableIds = props.product.removableItems.map(ri => ri.ingredientId)
+  return props.product.technicalSheet.filter(i => removableIds.includes(i.ingredientId || i.id))
 })
 
 // ── Helpers para checkbox ──
@@ -401,7 +426,7 @@ const handleConfirm = () => {
     }
   }
 
-  const removals = removableIngredients.value.filter(i => selectedRemovals.value.includes(i.id))
+  const removals = removableIngredients.value.filter(i => selectedRemovals.value.includes(i.ingredientId || i.id))
 
   const customizedItem = {
     cartItemId: `${props.product.id}-${Date.now()}`,

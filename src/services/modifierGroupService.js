@@ -2,7 +2,8 @@ import api from './api'
 
 export const modifierGroupService = {
   getAll: async () => {
-    const response = await api.get('/modifier-groups')
+    // Busca até 1000 grupos de uma vez para permitir busca e paginação client-side fluidas
+    const response = await api.get('/modifier-groups?size=1000')
     return response.data.content || response.data
   },
   getById: async (id) => {
