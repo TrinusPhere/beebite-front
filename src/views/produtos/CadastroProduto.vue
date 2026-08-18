@@ -73,12 +73,18 @@ onMounted(async () => {
       const itemToEdit = await productService.getById(route.params.id)
       if (itemToEdit) {
         Object.assign(form, itemToEdit)
+        if (itemToEdit.removableItems) {
+          form.removableItemIds = itemToEdit.removableItems.map(item => item.ingredientId)
+        }
       }
     } else if (route.query.cloneId) {
       isEditing.value = false
       const itemToClone = await productService.getById(route.query.cloneId)
       if (itemToClone) {
         Object.assign(form, itemToClone)
+        if (itemToClone.removableItems) {
+          form.removableItemIds = itemToClone.removableItems.map(item => item.ingredientId)
+        }
         form.id = null // Ensure it's treated as a new product
         form.name = `${itemToClone.name} (Cópia)`
       }

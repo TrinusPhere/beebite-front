@@ -22,10 +22,10 @@ const dashboardData = ref({
 })
 
 const statStyles = [
-  { icon: 'DollarSign', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { icon: 'Users', color: 'text-blue-600', bg: 'bg-blue-50' },
-  { icon: 'ShoppingBag', color: 'text-orange-600', bg: 'bg-orange-50' },
-  { icon: 'TrendingUp', color: 'text-purple-600', bg: 'bg-purple-50' }
+  { icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  { icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+  { icon: ShoppingBag, color: 'text-orange-600', bg: 'bg-orange-50' },
+  { icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' }
 ]
 
 const fetchDashboard = async () => {
@@ -78,21 +78,25 @@ onMounted(() => {
       <div
         v-for="stat in dashboardData.stats"
         :key="stat.name"
-        class="bg-white border border-slate-200 p-6 rounded-3xl hover:border-orange-200 transition-all shadow-sm group"
+        class="bg-white border border-slate-200 p-6 rounded-3xl hover:border-orange-200 transition-all shadow-sm group flex flex-col justify-between"
       >
-        <div :class="['p-3 rounded-2xl transition-colors', stat.bg, stat.color]">
-          <component :is="stat.icon" :size="24" />
+        <div class="flex items-center justify-between">
+          <div :class="['inline-flex items-center justify-center w-12 h-12 rounded-2xl transition-colors', stat.bg, stat.color]">
+            <component :is="stat.icon" :size="24" />
+          </div>
+          <span v-if="stat.change" :class="[
+            'inline-flex items-center text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-wider',
+            stat.change.startsWith('+') ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+          ]">
+            {{ stat.change }}
+            <ArrowUpRight v-if="stat.change.startsWith('+')" :size="12" class="ml-1" />
+            <ArrowDownRight v-else :size="12" class="ml-1" />
+          </span>
         </div>
-        <span v-if="stat.change" :class="[
-          'flex items-center text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-wider mt-4',
-          stat.change.startsWith('+') ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
-        ]">
-          {{ stat.change }}
-          <ArrowUpRight v-if="stat.change.startsWith('+')" :size="12" class="ml-1" />
-          <ArrowDownRight v-else :size="12" class="ml-1" />
-        </span>
-        <p class="text-slate-400 text-xs font-black uppercase tracking-widest mt-2">{{ stat.name }}</p>
-        <h3 class="text-2xl font-black text-slate-800 mt-1">{{ stat.value }}</h3>
+        <div class="mt-4">
+          <p class="text-slate-400 text-xs font-black uppercase tracking-widest">{{ stat.name }}</p>
+          <h3 class="text-2xl font-black text-slate-800 mt-1 truncate">{{ stat.value }}</h3>
+        </div>
       </div>
     </div>
 

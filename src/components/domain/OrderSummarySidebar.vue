@@ -17,7 +17,7 @@
           <p class="text-sm">O carrinho está vazio.</p>
         </div>
         
-        <div v-for="(item, index) in order.items" :key="index" class="bg-slate-800/50 rounded-xl p-3 border border-slate-700">
+        <div v-for="(item, index) in order.items" :key="index" class="bg-slate-800/50 rounded-xl p-3 border border-slate-700 hover:border-orange-500/50 cursor-pointer transition-colors" @click="$emit('edit-item', index)">
           <div class="flex justify-between items-start gap-2">
             <div class="flex-1 min-w-0">
               <p class="text-sm font-bold text-slate-100 leading-tight flex items-center gap-1.5">
@@ -41,7 +41,7 @@
             
             <div class="flex flex-col items-end gap-1 shrink-0">
               <span class="text-xs font-bold text-emerald-400">R$ {{ (item.totalPrice * item.quantity).toFixed(2) }}</span>
-              <button @click="$emit('remove-item', index)" class="text-slate-500 hover:text-red-400">
+              <button @click.stop="$emit('remove-item', index)" class="text-slate-500 hover:text-red-400" title="Remover item">
                 <Trash2 :size="12" />
               </button>
             </div>
@@ -107,7 +107,7 @@ defineProps({
   loading: { type: Boolean, default: false }
 })
 
-defineEmits(['remove-item', 'update:paymentMethod', 'finish', 'cancel'])
+defineEmits(['remove-item', 'edit-item', 'update:paymentMethod', 'finish', 'cancel'])
 </script>
 
 <style scoped>

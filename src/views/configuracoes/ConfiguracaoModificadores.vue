@@ -231,7 +231,7 @@
           <div class="space-y-2">
             <div
               v-for="ingredient in selectedProductForRemoval.technicalSheet"
-              :key="ingredient.id"
+              :key="ingredient.ingredientId"
               class="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-slate-50 hover:bg-slate-100/60 transition-all"
             >
               <div class="flex items-center gap-3">
@@ -244,16 +244,16 @@
 
               <!-- Toggle switch -->
               <button
-                @click="toggleRemovable(selectedProductForRemoval, ingredient.id)"
+                @click="toggleRemovable(selectedProductForRemoval, ingredient.ingredientId)"
                 :class="[
                   'relative w-11 h-6 rounded-full transition-all duration-300 shrink-0',
-                  isRemovable(selectedProductForRemoval, ingredient.id) ? 'bg-orange-500' : 'bg-slate-200'
+                  isRemovable(selectedProductForRemoval, ingredient.ingredientId) ? 'bg-orange-500' : 'bg-slate-200'
                 ]"
-                :aria-label="isRemovable(selectedProductForRemoval, ingredient.id) ? 'Desativar' : 'Ativar'"
+                :aria-label="isRemovable(selectedProductForRemoval, ingredient.ingredientId) ? 'Desativar' : 'Ativar'"
               >
                 <span :class="[
                   'absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-300',
-                  isRemovable(selectedProductForRemoval, ingredient.id) ? 'translate-x-5' : 'translate-x-0'
+                  isRemovable(selectedProductForRemoval, ingredient.ingredientId) ? 'translate-x-5' : 'translate-x-0'
                 ]" />
               </button>
             </div>
@@ -480,7 +480,10 @@ onMounted(async () => {
     modifierGroupsDB.value = await modifierGroupService.getAll()
     additionalsDB.value = await additionalService.getAll()
     const pResponse = await productService.getAll(null, 0, 1000)
-    productsDB.value = pResponse.content || []
+    productsDB.value = (pResponse.content || []).map(p => ({
+      ...p,
+      removableItemIds: (p.removableItems || []).map(r => r.ingredientId)
+    }))
   } catch (err) {
     console.error('Erro ao carregar configurações:', err)
   }

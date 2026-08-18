@@ -137,7 +137,6 @@
         </div>
       </div>
 
-      <!-- Resumo do Pedido (Sidebar Fixa à direita) -->
       <OrderSummarySidebar 
         :order="sidebarOrder"
         :itemsTotalPrice="itemsTotalPrice"
@@ -145,6 +144,7 @@
         :totalOrderPrice="totalOrderPrice"
         :loading="loading"
         @remove-item="removeItemFromOrder"
+        @edit-item="editItemFromOrder"
         @update:paymentMethod="order.paymentMethod = $event"
         @finish="requestOrderConfirmation"
         @cancel="cancelOrder"
@@ -155,9 +155,10 @@
     <ItemCustomizationModal
       v-model="showCustomizationModal"
       :product="selectedProductForModal"
+      :initial-item="itemToEdit"
       :all-modifier-groups="allModifierGroups"
       @confirm="onModalConfirm"
-      @cancel="showCustomizationModal = false"
+      @cancel="showCustomizationModal = false; editItemIndex = -1; itemToEdit = null"
     />
 
     <OrderConfirmationModal 
@@ -322,28 +323,53 @@ const loadCatalog = async () => {
 }
 
 const productCategories = computed(() => {
-  return [...new Set(availableProducts.value.map(p => p.category))]
+  return [...new Set(availableProducts.value.map(p => p.categoryName).filter(Boolean))]
 })
 
 const filteredProducts = computed(() => {
   if (!selectedCategory.value) return availableProducts.value
-  return availableProducts.value.filter(p => p.category === selectedCategory.value)
+  return availableProducts.value.filter(p => p.categoryName === selectedCategory.value)
 })
 
-// ── Modal de Customização ──
 const showCustomizationModal = ref(false)
 const selectedProductForModal = ref(null)
+const itemToEdit = ref(null)
+const editItemIndex = ref(-1)
 
 const openCustomizationModal = (product) => {
+  editItemIndex.value = -1
+  itemToEdit.value = null
   selectedProductForModal.value = product
   showCustomizationModal.value = true
 }
 
+const editItemFromOrder = (index) => {
+  if (isEditMode.value && originalItemsText.value) {
+    if (index === 0) return // Não pode editar os itens originais do resumo
+    editItemIndex.value = index - 1
+  } else {
+    editItemIndex.value = index
+  }
+  const item = order.value.items[editItemIndex.value]
+  itemToEdit.value = item
+  selectedProductForModal.value = item.product
+  showCustomizationModal.value = true
+}
+
 const onModalConfirm = (customizedItem) => {
-  order.value.items.push({
-    ...customizedItem,
-    observation: customizedItem.observation || '',
-  })
+  if (editItemIndex.value !== -1) {
+    order.value.items[editItemIndex.value] = {
+      ...customizedItem,
+      observation: customizedItem.observation || '',
+    }
+    editItemIndex.value = -1
+    itemToEdit.value = null
+  } else {
+    order.value.items.push({
+      ...customizedItem,
+      observation: customizedItem.observation || '',
+    })
+  }
 }
 
 const removeItemFromOrder = (index) => {
