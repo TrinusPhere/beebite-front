@@ -371,7 +371,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   SlidersHorizontal, Plus, Pencil, Trash2, Layers,
   X, Info, Boxes, ListChecks, MinusCircle
