@@ -8,7 +8,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Clock,
-  ChevronRight
+  ChevronRight,
+  Bike
 } from 'lucide-vue-next'
 import { financialService } from '@/services/financialService'
 
