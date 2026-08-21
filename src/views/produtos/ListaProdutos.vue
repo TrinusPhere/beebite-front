@@ -202,10 +202,10 @@ const removeProduct = async (id) => {
               <td class="px-6 py-4 text-center">
                 <div class="flex flex-col items-center">
                   <span class="text-xs font-black text-emerald-600">
-                    R$ {{ (item.price - item.cost).toFixed(2) }}
+                    R$ {{ (item.price - item.totalCost).toFixed(2) }}
                   </span>
                   <span class="text-[9px] font-bold text-slate-400">
-                    {{ item.price > 0 ? (((item.price - item.cost) / item.price) * 100).toFixed(0) : 0 }}% margem
+                    {{ item.price > 0 ? (((item.price - item.totalCost) / item.price) * 100).toFixed(0) : 0 }}% margem
                   </span>
                 </div>
               </td>

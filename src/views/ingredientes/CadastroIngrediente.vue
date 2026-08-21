@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Save, X, Package, DollarSign, Database, ChevronLeft, AlertCircle } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
@@ -55,6 +55,135 @@ const handleSubmit = async () => {
     loading.value = false
   }
 }
+
+const formatPrice = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return ''
+  }
+
+  return Number(value).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  })
+}
+
+const handlePriceInput = (event) => {
+  const value = event.target.value.replace(/\D/g, '')
+
+  form.costPrice = Number(value) / 100
+
+  event.target.value = formatPrice(form.price)
+}
+const handleStockInput = (event, field) => {
+  let value = event.target.value
+
+  // UN, G e ML: somente inteiro
+  if (['UN', 'G', 'ML'].includes(form.unit)) {
+    value = value.replace(/\D/g, '')
+
+    const number = parseInt(value, 10)
+
+    form[field] = isNaN(number) ? null : number
+
+    return
+  }
+
+  // KG e L: começa pelas casas decimais
+  if (['KG', 'L'].includes(form.unit)) {
+    const digits = value.replace(/\D/g, '')
+
+    if (!digits) {
+      form[field] = null
+      return
+    }
+
+    form[field] = Number(digits) / 100
+  }
+}
+const formatStockValue = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return ''
+  }
+
+  const number = Number(value)
+
+  if (isNaN(number)) {
+    return ''
+  }
+
+  if (['KG', 'L'].includes(form.unit)) {
+    return number.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })
+  }
+
+  return Math.trunc(number).toLocaleString('pt-BR')
+}
+const stockPlaceholder = computed(() => {
+  switch (form.unit) {
+    case 'UN':
+      return 'Ex: 10'
+
+    case 'KG':
+      return 'Ex: 1,500'
+
+    case 'G':
+      return 'Ex: 500'
+
+    case 'L':
+      return 'Ex: 2,000'
+
+    case 'ML':
+      return 'Ex: 500'
+
+    default:
+      return '0'
+  }
+})
+
+const minStockPlaceholder = computed(() => {
+  switch (form.unit) {
+    case 'UN':
+      return 'Ex: 5'
+
+    case 'KG':
+      return 'Ex: 0,500'
+
+    case 'G':
+      return 'Ex: 100'
+
+    case 'L':
+      return 'Ex: 0,500'
+
+    case 'ML':
+      return 'Ex: 250'
+
+    default:
+      return '0'
+  }
+})
+const handleUnitChange = () => {
+  if (form.unit === 'UN') {
+    if (form.stock) {
+      form.stock = Math.max(1, Math.trunc(Number(form.stock)))
+    }
+
+    if (form.minStock) {
+      form.minStock = Math.max(1, Math.trunc(Number(form.minStock)))
+    }
+  }
+
+  if (['G', 'ML'].includes(form.unit)) {
+    if (form.stock) {
+      form.stock = Math.trunc(Number(form.stock))
+    }
+
+    if (form.minStock) {
+      form.minStock = Math.trunc(Number(form.minStock))
+    }
+  }
+}
 </script>
 
 <template>
@@ -104,17 +233,32 @@ const handleSubmit = async () => {
               <Package class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" :size="18" />
               <input v-model="form.name" type="text" placeholder="Ex: Hambúrguer de Carne 150g" required class="w-full bg-slate-50 border border-slate-200 text-sm pl-10 p-3.5 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all font-medium">
             </div>
-          </div>
-
+          </div>         
           <!-- Estoque -->
           <div class="space-y-2">
-            <label class="text-xs font-black text-slate-700 ml-1 uppercase tracking-wider">Estoque Atual</label>
+            <label class="text-xs font-black text-slate-700 ml-1 uppercase tracking-wider">
+              Estoque Atual
+            </label>
+
             <div class="flex gap-2">
               <div class="relative flex-1">
                 <Database class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" :size="18" />
-                <input v-model="form.stock" type="number" step="0.01" placeholder="0.00" required class="w-full bg-slate-50 border border-slate-200 text-sm pl-10 p-3.5 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all font-bold">
+                <input
+                  :value="formatStockValue(form.stock)"
+                  @input="handleStockInput($event, 'stock')"
+                  type="text"
+                  inputmode="decimal"
+                  :placeholder="stockPlaceholder"
+                  required
+                  class="w-full bg-slate-50 border border-slate-200 text-sm pl-10 p-3.5 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all font-bold"
+                />
               </div>
-              <select v-model="form.unit" class="bg-slate-50 border border-slate-200 text-sm px-4 rounded-xl focus:ring-2 focus:ring-orange-500/20 outline-none font-black text-slate-700 uppercase">
+
+              <select
+                v-model="form.unit"
+                @change="handleUnitChange"
+                class="bg-slate-50 border border-slate-200 text-sm px-4 rounded-xl focus:ring-2 focus:ring-orange-500/20 outline-none font-black text-slate-700 uppercase"
+              >
                 <option value="UN">UN</option>
                 <option value="KG">KG</option>
                 <option value="G">G</option>
@@ -124,18 +268,27 @@ const handleSubmit = async () => {
             </div>
           </div>
 
-          <!-- Alerta Mínimo -->
+          <!-- Estoque Mínimo -->
           <div class="space-y-2">
-            <label class="text-xs font-black text-slate-700 ml-1 uppercase tracking-wider">Alerta de Estoque Mínimo</label>
-            <input v-model="form.minStock" type="number" placeholder="Ex: 5" class="w-full bg-slate-50 border border-slate-200 text-sm p-3.5 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all font-medium">
-          </div>
+            <label class="text-xs font-black text-slate-700 ml-1 uppercase tracking-wider">
+              Alerta de Estoque Mínimo
+            </label>
 
+            <input
+              :value="formatStockValue(form.minStock)"
+              @input="handleStockInput($event, 'minStock')"
+              type="text"
+              inputmode="decimal"
+              :placeholder="minStockPlaceholder"
+              class="w-full bg-slate-50 border border-slate-200 text-sm p-3.5 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all font-medium"
+            />
+          </div>
           <!-- Preço de Custo -->
           <div class="space-y-2">
             <label class="text-xs font-black text-slate-700 ml-1 uppercase tracking-wider">Custo Unitário (R$)</label>
             <div class="relative">
               <DollarSign class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" :size="18" />
-              <input v-model="form.costPrice" type="number" step="0.01" placeholder="0,00" required class="w-full bg-slate-50 border border-slate-200 text-sm pl-10 p-3.5 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all font-bold text-orange-600">
+              <input :value="formatPrice(form.costPrice)" @input="handlePriceInput" type="text" inputmode="numeric" class="w-full bg-slate-50 border border-slate-200 text-sm pl-10 p-3.5 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all font-bold text-orange-600"/>
             </div>
           </div>
         </div>

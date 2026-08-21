@@ -16,7 +16,6 @@ import {
   Utensils, // Ícone
 } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
-import ChatDrawer from '@/components/ChatDrawer.vue'
 import { orderService } from '@/services/orderService'
 import { driverService } from '@/services/driverService'
 
