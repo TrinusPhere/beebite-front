@@ -69,6 +69,8 @@ const removeIngredient = async (id) => {
             <tr class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
               <th class="px-6 py-4">Ingrediente</th>
               <th class="px-6 py-4 text-center">Estoque</th>
+              <th class="px-6 py-4">Estoque minimo</th>
+              <th class="px-6 py-4">Custo</th>
               <th class="px-6 py-4 text-right">Ações</th>
             </tr>
           </thead>
@@ -76,10 +78,12 @@ const removeIngredient = async (id) => {
             <tr v-for="item in filteredIngredients" :key="item.id" class="hover:bg-slate-50">
               <td class="px-6 py-4 font-bold text-slate-700">{{ item.name }}</td>
               <td class="px-6 py-4 text-center">
-                <span class="px-3 py-1 rounded-full text-[10px] font-black" :class="item.lowStock ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'">
+                <span class="px-3 py-1 rounded-full text-[10px] font-black" :class="item.stock <= item.minStock ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'">
                   {{ item.stock }} {{ item.unit }}
                 </span>
               </td>
+              <td class="px-14 py-4 rounded-full text-[10px] font-black">{{ item.minStock }} {{ item.unit }}</td>
+              <td class="px-6 py-4 rounded-full text-[10px] font-black">{{ Number(item.costPrice || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }}</td>
               <td class="px-6 py-4 text-right">
                 <div class="flex justify-end gap-2">
                   <button @click="router.push(`/ingredientes/editar/${item.id}`)" class="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg">

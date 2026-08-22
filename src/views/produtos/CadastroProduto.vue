@@ -1,8 +1,9 @@
 <script setup>
 import { reactive, ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Save, X, ShoppingBag, Trash2, Search, ChevronLeft, Calculator, UtensilsCrossed, Plus } from 'lucide-vue-next'
+import { Save, X, DollarSign, ShoppingBag, Trash2, Search, ChevronLeft, Calculator, UtensilsCrossed, Plus, CheckCircle, CircleAlert } from 'lucide-vue-next'
 import BaseButton from '@/components/BaseButton.vue'
+import BaseModal from '@/components/BaseModal.vue'
 import { productService } from '@/services/productService'
 import { ingredientService } from '@/services/ingredientService'
 import { modifierGroupService } from '@/services/modifierGroupService'
@@ -23,6 +24,24 @@ const modifierGroups = ref([])
 const availableCategories = ref([])
 const isCreatingNewCategory = ref(false)
 const newCategoryName = ref('')
+
+const showMessageModal = ref(false)
+const modalType = ref('success')
+const modalTitle = ref('')
+const modalMessage = ref('')
+const redirectAfterClose = ref(false)
+
+const showNewIngredientModal = ref(false)
+const creatingIngredient = ref(false)
+
+const newIngredient = reactive({
+  id: null,
+  name: '',
+  unit: 'UN',
+  stock: 0,
+  minStock: 0,
+  costPrice: 0
+})
 
 const handleCategoryChange = (e) => {
   if (e.target.value === 'NEW_CATEGORY_OPTION') {
@@ -122,41 +141,71 @@ const closeIngredientModal = () => {
   searchIngredienteModal.value = ''
   selectedIngredientsInModal.value = []
 }
-
 const addSelectedIngredientsToSheet = () => {
-  form.technicalSheet = form.technicalSheet.filter(item => 
-    selectedIngredientsInModal.value.includes(item.ingredientId || item.id)
+
+  form.technicalSheet = form.technicalSheet.filter(item =>
+    selectedIngredientsInModal.value.includes(
+      item.ingredientId ?? item.id
+    )
   )
 
   selectedIngredientsInModal.value.forEach(ingredientId => {
-    const existingItem = form.technicalSheet.find(item => (item.ingredientId || item.id) === ingredientId)
-    const quantity = modalQuantities.value[ingredientId] || 1
+
+    const ingredientToAdd = availableIngredients.value.find(
+      ing => ing.id === ingredientId
+    )
+
+    if (!ingredientToAdd) {
+      return
+    }
+
+    const existingItem = form.technicalSheet.find(
+      item => (item.ingredientId ?? item.id) === ingredientId
+    )
+
+    // Pega exatamente o valor digitado no modal
+    const modalQuantity = modalQuantities.value[ingredientId]
+
+    // Só coloca 1 se realmente não tiver sido informado nada
+    const quantity =
+      modalQuantity === null ||
+      modalQuantity === undefined ||
+      modalQuantity === ''
+        ? 1
+        : Number(modalQuantity)
 
     if (existingItem) {
+
       existingItem.quantity = quantity
+
+      existingItem.unit = ingredientToAdd.unit
+
+      existingItem.name = ingredientToAdd.name
+      existingItem.cost = ingredientToAdd.costPrice || 0
+
     } else {
-      const ingredientToAdd = availableIngredients.value.find(ing => ing.id === ingredientId)
-      if (ingredientToAdd) {
-        form.technicalSheet.push({
-          ingredientId: ingredientToAdd.id,
-          id: ingredientToAdd.id,
-          name: ingredientToAdd.name,
-          unit: ingredientToAdd.unit,
-          cost: ingredientToAdd.costPrice || 0,
-          quantity: quantity
-        })
-      }
+
+      form.technicalSheet.push({
+        ingredientId: ingredientToAdd.id,
+        id: ingredientToAdd.id,
+        name: ingredientToAdd.name,
+        unit: ingredientToAdd.unit,
+        cost: ingredientToAdd.costPrice || 0,
+        quantity: quantity
+      })
+
     }
   })
+
   closeIngredientModal()
 }
 
 const handleSubmit = async () => {
   loading.value = true
+
   try {
     const payload = { ...form }
-    
-    // map the frontend format to backend format if necessary
+
     payload.technicalSheet = payload.technicalSheet.map(i => ({
       ingredientId: i.ingredientId || i.id,
       quantity: i.quantity
@@ -164,19 +213,347 @@ const handleSubmit = async () => {
 
     if (isEditing.value) {
       await productService.update(form.id, payload)
-      alert('Produto atualizado com sucesso!')
+
+      modalType.value = 'success'
+      modalTitle.value = 'Produto atualizado!'
+      modalMessage.value = 'Produto atualizado com sucesso.'
     } else {
       delete payload.id
       await productService.create(payload)
-      alert('Produto cadastrado com sucesso!')
+
+      modalType.value = 'success'
+      modalTitle.value = 'Produto cadastrado!'
+      modalMessage.value = 'Produto cadastrado com sucesso.'
     }
-    router.push('/produtos')
+
+    redirectAfterClose.value = true
+    showMessageModal.value = true
+
   } catch (err) {
     console.error('Erro ao salvar produto', err)
-    alert('Erro ao salvar produto. Verifique os dados.')
+
+    modalType.value = 'error'
+    modalTitle.value = 'Erro ao salvar'
+    modalMessage.value = 'Não foi possível salvar o produto. Verifique os dados.'
+
+    redirectAfterClose.value = false
+    showMessageModal.value = true
+
   } finally {
     loading.value = false
   }
+}
+
+const closeMessageModal = () => {
+  showMessageModal.value = false
+
+  if (redirectAfterClose.value) {
+    router.push('/produtos')
+  }
+}
+
+const openNewIngredientModal = () => {
+  newIngredient.id = null
+  newIngredient.name = ''
+  newIngredient.unit = 'UN'
+  newIngredient.stock = 0
+  newIngredient.minStock = 0
+  newIngredient.costPrice = 0
+
+  showNewIngredientModal.value = true
+}
+
+const closeNewIngredientModal = () => {
+  showNewIngredientModal.value = false
+}
+
+const saveNewIngredient = async () => {
+  if (!newIngredient.name.trim()) {
+    modalType.value = 'error'
+    modalTitle.value = 'Nome obrigatório'
+    modalMessage.value = 'Informe o nome do ingrediente.'
+    redirectAfterClose.value = false
+    showMessageModal.value = true
+    return
+  }
+
+  creatingIngredient.value = true
+
+  try {
+    const payload = {
+      name: newIngredient.name.trim(),
+      unit: newIngredient.unit,
+      stock: Number(newIngredient.stock || 0),
+      minStock: Number(newIngredient.minStock || 0),
+      costPrice: Number(newIngredient.costPrice || 0)
+    }
+
+    let savedIngredient
+
+    /*
+     * IMPORTANTE:
+     * Dentro desta tela, form.id é o ID do PRODUTO.
+     * Portanto, para atualizar um ingrediente usamos newIngredient.id.
+     *
+     * O equivalente correto da sua chamada:
+     * await ingredientService.update(form.id, payload)
+     *
+     * neste contexto é:
+     * await ingredientService.update(newIngredient.id, payload)
+     */
+    if (newIngredient.id) {
+      savedIngredient = await ingredientService.update(
+        newIngredient.id,
+        payload
+      )
+    } else {
+      // Cadastro de um ingrediente novo.
+      // O service precisa possuir o método create para a rota de inclusão.
+      savedIngredient = await ingredientService.create(payload)
+    }
+
+    /*
+     * Alguns backends não retornam o objeto criado no POST/PUT.
+     * Por isso recarregamos a lista após salvar.
+     */
+    availableIngredients.value = await ingredientService.getAll()
+
+    let ingredientSaved = null
+
+    if (savedIngredient?.id) {
+      ingredientSaved = availableIngredients.value.find(
+        ing => ing.id === savedIngredient.id
+      ) || savedIngredient
+    }
+
+    if (!ingredientSaved) {
+      ingredientSaved = availableIngredients.value.find(
+        ing =>
+          ing.name?.trim().toLowerCase() ===
+          newIngredient.name.trim().toLowerCase()
+      )
+    }
+
+    /*
+     * Se localizamos o ingrediente recém-cadastrado,
+     * já o marcamos na lista do modal.
+     */
+    if (ingredientSaved?.id) {
+      if (!selectedIngredientsInModal.value.includes(ingredientSaved.id)) {
+        selectedIngredientsInModal.value.push(ingredientSaved.id)
+      }
+
+      // Quantidade inicial de acordo com a unidade.
+      modalQuantities.value[ingredientSaved.id] =
+        ['KG', 'L'].includes(ingredientSaved.unit) ? 0.01 : 1
+    }
+
+    closeNewIngredientModal()
+
+    modalType.value = 'success'
+    modalTitle.value = newIngredient.id
+      ? 'Ingrediente atualizado!'
+      : 'Ingrediente cadastrado!'
+    modalMessage.value = newIngredient.id
+      ? 'Ingrediente atualizado com sucesso.'
+      : 'Ingrediente cadastrado com sucesso.'
+
+    redirectAfterClose.value = false
+    showMessageModal.value = true
+
+  } catch (err) {
+    console.error('Erro ao salvar ingrediente', err)
+
+    modalType.value = 'error'
+    modalTitle.value = 'Erro ao salvar ingrediente'
+    modalMessage.value =
+      err?.response?.data?.message ||
+      'Não foi possível salvar o ingrediente. Verifique os dados.'
+
+    redirectAfterClose.value = false
+    showMessageModal.value = true
+  } finally {
+    creatingIngredient.value = false
+  }
+}
+
+const handlePriceInput = (event) => {
+  const value = event.target.value.replace(/\D/g, '')
+
+  form.price = Number(value) / 100
+
+  event.target.value = formatPrice(form.price)
+}
+
+const formatCurrency = (value) => {
+  return Number(value || 0).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  })
+}
+const handleIngredientQuantity = (event, ingredient) => {
+  const input = event.target
+  const digits = input.value.replace(/\D/g, '')
+
+  if (!digits) {
+    modalQuantities.value[ingredient.id] = null
+    input.value = ''
+    return
+  }
+
+  // UN, G e ML = inteiro
+  if (['UN', 'G', 'ML'].includes(ingredient.unit)) {
+    const value = parseInt(digits, 10)
+
+    modalQuantities.value[ingredient.id] = value
+    input.value = value.toLocaleString('pt-BR')
+
+    console.log('SALVANDO:', ingredient.id, modalQuantities.value[ingredient.id])
+    return
+  }
+
+  // KG e L = decimal com máscara
+  if (['KG', 'L'].includes(ingredient.unit)) {
+    const value = Number(digits) / 100
+
+    modalQuantities.value[ingredient.id] = value
+
+    input.value = value.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })
+
+    console.log('SALVANDO:', ingredient.id, modalQuantities.value[ingredient.id])
+  }
+}
+const formatIngredientQuantity = (value, unit) => {
+  if (value === null || value === undefined || value === '') {
+    return ''
+  }
+
+  const number = Number(value)
+
+  if (isNaN(number)) {
+    return ''
+  }
+
+  if (['KG', 'L'].includes(unit)) {
+    return number.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })
+  }
+
+  return Math.trunc(number).toString()
+}
+const handleNewIngredientStock = (event, field) => {
+  const input = event.target
+  const digits = input.value.replace(/\D/g, '')
+
+  if (!digits) {
+    newIngredient[field] = null
+    input.value = ''
+    return
+  }
+
+  // UN, G e ML = inteiro
+  if (['UN', 'G', 'ML'].includes(newIngredient.unit)) {
+    const value = parseInt(digits, 10)
+
+    newIngredient[field] = value
+    input.value = value.toLocaleString('pt-BR')
+
+    return
+  }
+
+  // KG e L = decimal com máscara
+  if (['KG', 'L'].includes(newIngredient.unit)) {
+    const value = Number(digits) / 100
+
+    newIngredient[field] = value
+
+    input.value = value.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })
+  }
+}
+const formatNewIngredientStock = (value) => {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ''
+  ) {
+    return ''
+  }
+
+  const number = Number(value)
+
+  if (isNaN(number)) {
+    return ''
+  }
+
+  if (['KG', 'L'].includes(newIngredient.unit)) {
+    return number.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })
+  }
+
+  return Math.trunc(number).toLocaleString('pt-BR')
+}
+const handleNewIngredientUnitChange = () => {
+  if (['UN', 'G', 'ML'].includes(newIngredient.unit)) {
+    if (newIngredient.stock !== null) {
+      newIngredient.stock = Math.trunc(Number(newIngredient.stock || 0))
+    }
+
+    if (newIngredient.minStock !== null) {
+      newIngredient.minStock = Math.trunc(
+        Number(newIngredient.minStock || 0)
+      )
+    }
+  }
+}
+const formatPrice = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return ''
+  }
+
+  return Number(value).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  })
+}
+const formatNewIngredientCost = (value) => {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ''
+  ) {
+    return ''
+  }
+
+  return Number(value).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  })
+}
+
+const handleNewIngredientCost = (event) => {
+  const digits = event.target.value.replace(/\D/g, '')
+
+  if (!digits) {
+    newIngredient.costPrice = 0
+    event.target.value = ''
+    return
+  }
+
+  newIngredient.costPrice = Number(digits) / 100
+
+  event.target.value = formatNewIngredientCost(
+    newIngredient.costPrice
+  )
 }
 </script>
 
@@ -222,7 +599,7 @@ const handleSubmit = async () => {
               <div class="flex justify-between items-center mb-1">
                 <span class="text-slate-400 text-xs font-bold uppercase tracking-wider">Lucro Real</span>
                 <span :class="['text-xl font-black', profit > 0 ? 'text-emerald-400' : 'text-red-400']">
-                  R$ {{ profit.toFixed(2) }}
+                    {{ formatCurrency(profit) }}
                 </span>
               </div>
             </div>
@@ -293,7 +670,7 @@ const handleSubmit = async () => {
             </div>
             <div class="space-y-1">
               <label class="text-xs font-bold text-slate-700 ml-1">Preço de Venda</label>
-              <input v-model="form.price" type="number" step="0.01" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20 font-bold text-orange-600">
+              <input :value="formatPrice(form.price)" @input="handlePriceInput" type="text" inputmode="numeric" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20 font-bold text-orange-600"/>
             </div>
           </div>
         </div>
@@ -376,8 +753,12 @@ const handleSubmit = async () => {
     </div>
 
     <!-- Modal de Seleção de Ingredientes -->
-    <div v-if="showIngredientModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white p-6 rounded-3xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <BaseModal
+      :show="showIngredientModal"
+      maxWidth="max-w-2xl"
+      @close="closeIngredientModal"
+    >
+      <div class="max-h-[90vh] flex flex-col">
         <h3 class="text-xl font-bold text-slate-800 mb-4">Selecionar Ingredientes</h3>
         <div class="relative mb-4">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" :size="20" />
@@ -402,14 +783,19 @@ const handleSubmit = async () => {
             
             <div class="flex items-center gap-2" @click.stop>
               <input 
-                type="number" 
-                v-model="modalQuantities[ingredient.id]" 
+                type="text"
+                inputmode="numeric"
+                :value="formatIngredientQuantity(
+                  modalQuantities[ingredient.id],
+                  ingredient.unit
+                )"
+                @input="handleIngredientQuantity($event, ingredient)"
                 class="w-20 p-2 text-center text-sm font-black bg-white border border-slate-200 rounded-lg outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
                 placeholder="Qtd"
-                min="0"
-                step="any"
-              >
-              <span class="text-[10px] font-black text-slate-400 uppercase w-6">{{ ingredient.unit }}</span>
+              />
+              <span class="text-[10px] font-black text-slate-400 uppercase w-6">
+                {{ ingredient.unit }}
+              </span>
             </div>
           </label>
           <p v-if="availableIngredients.filter(ing => ing.name.toLowerCase().includes(searchIngredienteModal.toLowerCase())).length === 0" class="text-slate-400 text-sm text-center py-4">
@@ -417,11 +803,146 @@ const handleSubmit = async () => {
           </p>
         </div>
 
-        <div class="flex justify-end gap-3 mt-6">
-          <BaseButton variant="secondary" @click="closeIngredientModal">Cancelar</BaseButton>
-          <BaseButton variant="primary" @click="addSelectedIngredientsToSheet">Adicionar</BaseButton>
+        <div class="flex justify-between items-center gap-3 mt-6">
+          <BaseButton variant="primary" @click="openNewIngredientModal">
+            <Plus :size="20" />
+            Novo Ingrediente
+          </BaseButton>
+
+          <div class="flex gap-3">
+            <BaseButton variant="secondary" @click="closeIngredientModal">Cancelar</BaseButton>
+            <BaseButton variant="primary" @click="addSelectedIngredientsToSheet">Adicionar</BaseButton>
+          </div>
         </div>
       </div>
-    </div>
+    </BaseModal>
+
+    <!-- Modal de Cadastro Rápido de Ingrediente -->
+    <BaseModal
+      :show="showNewIngredientModal"
+      maxWidth="max-w-lg"
+      @close="closeNewIngredientModal"
+    >
+      <div class="space-y-6">
+        <div>
+          <h3 class="text-xl font-bold text-slate-800">Novo Ingrediente</h3>
+          <p class="text-sm text-slate-500 mt-1">
+            Cadastre um ingrediente sem sair da ficha técnica.
+          </p>
+        </div>
+
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <label class="text-xs font-black text-slate-700 uppercase">Nome</label>
+            <input
+              v-model="newIngredient.name"
+              type="text"
+              placeholder="Ex: Queijo Mussarela"
+              class="w-full bg-slate-50 border border-slate-200 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+            />
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <!-- Estoque Atual -->
+            <div class="space-y-2">
+              <label class="text-xs font-black text-slate-700 uppercase">Estoque Atual</label>
+              <input
+                :value="formatNewIngredientStock(newIngredient.stock)"
+                @input="handleNewIngredientStock($event, 'stock')"
+                type="text"
+                inputmode="numeric"
+                class="w-full bg-slate-50 border border-slate-200 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20"
+                placeholder="0"
+              />
+            </div>
+            <!-- Unidade -->
+            <div class="space-y-2">
+              <label class="text-xs font-black text-slate-700 uppercase">Unidade</label>
+              <select
+                v-model="newIngredient.unit"
+                @change="handleNewIngredientUnitChange"
+                class="w-full bg-slate-50 border border-slate-200 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20 font-bold text-slate-700"
+              >
+                <option value="UN">UN</option>
+                <option value="KG">KG</option>
+                <option value="G">G</option>
+                <option value="L">L</option>
+                <option value="ML">ML</option>
+              </select>
+            </div>
+
+            <!-- Estoque Mínimo -->
+            <div class="space-y-2">
+              <label class="text-xs font-black text-slate-700 uppercase">Estoque Mínimo</label>
+              <input
+                :value="formatNewIngredientStock(newIngredient.minStock)"
+                @input="handleNewIngredientStock($event, 'minStock')"
+                type="text"
+                inputmode="numeric"
+                class="w-full bg-slate-50 border border-slate-200 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20"
+                placeholder="0"
+              />
+            </div>
+            <!-- Custo -->
+            <div class="space-y-2">
+              <label class="text-xs font-black text-slate-700 uppercase">Custo</label>
+              <DollarSign class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" :size="18" />
+              <input :value="formatNewIngredientCost(newIngredient.costPrice)" @input="handleNewIngredientCost" type="text" inputmode="numeric" placeholder="R$ 0,00" class="w-full bg-slate-50 border border-slate-200 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20 font-bold text-orange-600"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <BaseButton variant="secondary" @click="closeNewIngredientModal">
+            Cancelar
+          </BaseButton>
+
+          <BaseButton
+            variant="primary"
+            :loading="creatingIngredient"
+            @click="saveNewIngredient"
+          >
+            <Save :size="18" />
+            Cadastrar
+          </BaseButton>
+        </div>
+      </div>
+    </BaseModal>
+
+    <!-- Modal de Sucesso / Erro -->
+    <BaseModal
+      :show="showMessageModal"
+      @close="closeMessageModal"
+    >
+      <div class="flex flex-col items-center text-center">
+        <div
+          v-if="modalType === 'success'"
+          class="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mb-4"
+        >
+          <CheckCircle class="text-emerald-600" :size="36" />
+        </div>
+
+        <div
+          v-else
+          class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4"
+        >
+          <CircleAlert class="text-red-600" :size="36" />
+        </div>
+
+        <h3 class="text-xl font-bold text-slate-800 mb-2">
+          {{ modalTitle }}
+        </h3>
+
+        <p class="text-sm text-slate-500 mb-6">
+          {{ modalMessage }}
+        </p>
+
+        <div class="w-full flex justify-end">
+          <BaseButton variant="primary" @click="closeMessageModal">
+            Fechar
+          </BaseButton>
+        </div>
+      </div>
+    </BaseModal>
   </div>
 </template>
