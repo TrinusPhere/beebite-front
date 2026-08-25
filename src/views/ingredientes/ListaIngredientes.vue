@@ -1,47 +1,58 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { Plus, Search, Edit2, Trash2, Package } from 'lucide-vue-next'
-import BaseButton from '@/components/BaseButton.vue'
-import { ingredientService } from '@/services/ingredientService'
+import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import {
+  Plus,
+  Search,
+  Edit2,
+  Trash2,
+  Package,
+  ArrowRightLeft,
+} from "lucide-vue-next";
+import BaseButton from "@/components/BaseButton.vue";
+import { ingredientService } from "@/services/ingredientService";
 
-const router = useRouter()
-const searchQuery = ref('')
-const ingredients = ref([])
+const router = useRouter();
+const searchQuery = ref("");
+const ingredients = ref([]);
 
 onMounted(async () => {
   try {
-    ingredients.value = await ingredientService.getAll()
+    ingredients.value = await ingredientService.getAll();
   } catch (err) {
-    console.error('Erro ao carregar ingredientes', err)
+    console.error("Erro ao carregar ingredientes", err);
   }
-})
+});
 
 const filteredIngredients = computed(() => {
-  return ingredients.value.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-  )
-})
+  return ingredients.value.filter((item) =>
+    item.name.toLowerCase().includes(searchQuery.value.toLowerCase()),
+  );
+});
 
 const removeIngredient = async (id) => {
-  if (confirm('Tem certeza que deseja excluir este ingrediente?')) {
+  if (confirm("Tem certeza que deseja excluir este ingrediente?")) {
     try {
-      await ingredientService.delete(id)
-      ingredients.value = ingredients.value.filter(item => item.id !== id)
+      await ingredientService.delete(id);
+      ingredients.value = ingredients.value.filter((item) => item.id !== id);
     } catch (err) {
-      console.error('Erro ao excluir ingrediente', err)
-      alert('Erro ao excluir ingrediente.')
+      console.error("Erro ao excluir ingrediente", err);
+      alert("Erro ao excluir ingrediente.");
     }
   }
-}
+};
 </script>
 
 <template>
   <div class="space-y-6">
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div
+      class="flex flex-col md:flex-row md:items-center justify-between gap-4"
+    >
       <div>
         <h1 class="text-2xl font-bold text-slate-800">Ingredientes</h1>
-        <p class="text-slate-500 text-sm font-medium">Controle de estoque e custo de insumos</p>
+        <p class="text-slate-500 text-sm font-medium">
+          Controle de estoque e custo de insumos
+        </p>
       </div>
 
       <BaseButton variant="primary" @click="router.push('/ingredientes/novo')">
@@ -50,46 +61,104 @@ const removeIngredient = async (id) => {
       </BaseButton>
     </div>
 
-    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+    <div
+      class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden"
+    >
       <div class="p-4 border-b border-slate-100">
         <div class="relative max-w-md">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" :size="20" />
+          <Search
+            class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            :size="20"
+          />
           <input
             v-model="searchQuery"
             type="text"
             placeholder="Buscar ingredientes..."
             class="w-full bg-slate-50 border border-slate-200 text-sm pl-10 p-2.5 rounded-xl outline-none"
-          >
+          />
         </div>
       </div>
 
       <div class="overflow-x-auto">
         <table class="w-full text-left">
           <thead>
-            <tr class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            <tr
+              class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest"
+            >
               <th class="px-6 py-4">Ingrediente</th>
               <th class="px-6 py-4 text-center">Estoque</th>
               <th class="px-6 py-4">Estoque minimo</th>
               <th class="px-6 py-4">Custo</th>
+              <th class="px-6 py-4">Status</th>
               <th class="px-6 py-4 text-right">Ações</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-50">
-            <tr v-for="item in filteredIngredients" :key="item.id" class="hover:bg-slate-50">
-              <td class="px-6 py-4 font-bold text-slate-700">{{ item.name }}</td>
+            <tr
+              v-for="item in filteredIngredients"
+              :key="item.id"
+              class="hover:bg-slate-50"
+            >
+              <td class="px-6 py-4 font-bold text-slate-700">
+                {{ item.name }}
+              </td>
               <td class="px-6 py-4 text-center">
-                <span class="px-3 py-1 rounded-full text-[10px] font-black" :class="item.stock <= item.minStock ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'">
+                <span
+                  class="px-3 py-1 rounded-full text-[10px] font-black"
+                  :class="
+                    item.stock <= item.minStock
+                      ? 'bg-red-100 text-red-600'
+                      : 'bg-emerald-100 text-emerald-600'
+                  "
+                >
                   {{ item.stock }} {{ item.unit }}
                 </span>
               </td>
-              <td class="px-14 py-4 rounded-full text-[10px] font-black">{{ item.minStock }} {{ item.unit }}</td>
-              <td class="px-6 py-4 rounded-full text-[10px] font-black">{{ Number(item.costPrice || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }}</td>
+              <td class="px-14 py-4 rounded-full text-[10px] font-black">
+                {{ item.minStock }} {{ item.unit }}
+              </td>
+              <td class="px-6 py-4 rounded-full text-[10px] font-black">
+                {{
+                  Number(item.costPrice || 0).toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  })
+                }}
+              </td>
+              <td class="px-6 py-4">
+                <span
+                  :class="[
+                    'px-2 py-1 rounded-full text-[10px] font-black uppercase',
+                    item.active !== false
+                      ? 'bg-emerald-50 text-emerald-600'
+                      : 'bg-slate-100 text-slate-500',
+                  ]"
+                  >{{ item.active !== false ? "Ativo" : "Inativo" }}</span
+                >
+              </td>
               <td class="px-6 py-4 text-right">
                 <div class="flex justify-end gap-2">
-                  <button @click="router.push(`/ingredientes/editar/${item.id}`)" class="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg">
+                  <button
+                    @click="
+                      router.push(
+                        `/estoque/movimentacoes?ingredientId=${item.id}`,
+                      )
+                    "
+                    title="Movimentar estoque"
+                    class="p-2 text-slate-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg"
+                  >
+                    <ArrowRightLeft :size="16" />
+                  </button>
+                  <button
+                    @click="router.push(`/ingredientes/editar/${item.id}`)"
+                    class="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg"
+                  >
                     <Edit2 :size="16" />
                   </button>
-                  <button @click="removeIngredient(item.id)" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                  <button
+                    @click="removeIngredient(item.id)"
+                    class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                  >
                     <Trash2 :size="16" />
                   </button>
                 </div>

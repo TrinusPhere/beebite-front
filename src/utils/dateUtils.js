@@ -7,16 +7,16 @@
 export const getPeriodTimestamps = (period) => {
   const now = new Date();
   let startDate = new Date();
-  
-  if (period === 'DAILY') {
+
+  if (period === "DAILY") {
     startDate.setHours(0, 0, 0, 0);
-  } else if (period === 'WEEKLY') {
+  } else if (period === "WEEKLY") {
     // Retrocede para o início da semana (Segunda-feira)
     const day = startDate.getDay();
     const diff = startDate.getDate() - day + (day === 0 ? -6 : 1);
     startDate.setDate(diff);
     startDate.setHours(0, 0, 0, 0);
-  } else if (period === 'MONTHLY') {
+  } else if (period === "MONTHLY") {
     // Primeiro dia do mês
     startDate.setDate(1);
     startDate.setHours(0, 0, 0, 0);
@@ -31,6 +31,6 @@ export const getPeriodTimestamps = (period) => {
 
   return {
     startDate: startDate.getTime(),
-    endDate: endDate.getTime()
+    endDate: endDate.getTime(),
   };
-}
+};
