@@ -107,12 +107,18 @@
                 @input="onCustomerSearch"
                 @focus="showCustomerDropdown = true"
                 placeholder="Buscar ou digitar nome do cliente..."
+                class="w-full text-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all mb-3"
+              />
+              <input
+                type="text"
+                v-model="order.customer.phone"
+                placeholder="Telefone (Opcional)"
                 class="w-full text-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
               />
               <!-- Dropdown de sugestões -->
               <div
                 v-if="showCustomerDropdown && customerSuggestions.length > 0"
-                class="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto"
+                class="absolute z-20 top-12 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto"
               >
                 <button
                   v-for="c in customerSuggestions"
@@ -139,17 +145,51 @@
               <button
                 v-if="order.customer.id"
                 @click="clearCustomerSelection"
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                class="absolute right-3 top-[1.3rem] -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
               >
                 <X :size="14" />
               </button>
             </div>
-            <div v-if="order.serviceType === SERVICE_TYPES.ENTREGA">
+            <div v-if="order.serviceType === SERVICE_TYPES.ENTREGA" class="space-y-3">
               <input
                 type="text"
                 v-model="order.customer.address"
                 placeholder="Endereço Completo"
                 class="w-full text-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+              />
+              <div class="flex gap-3">
+                <input
+                  type="text"
+                  v-model="order.customer.complement"
+                  placeholder="Complemento"
+                  class="w-1/2 text-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                />
+                <input
+                  type="text"
+                  v-model="order.customer.reference"
+                  placeholder="Referência"
+                  class="w-1/2 text-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                />
+              </div>
+            </div>
+            <div v-else class="space-y-3">
+              <!-- Espaço reservado para manter alinhamento se não for entrega -->
+            </div>
+            
+            <div class="col-span-1 md:col-span-2 flex gap-4 mt-2">
+              <input
+                type="text"
+                v-model="order.notes"
+                placeholder="Observações do pedido (Opcional)"
+                class="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+              />
+              <input
+                type="number"
+                v-if="order.paymentMethod === 'dinheiro'"
+                v-model="order.cashChangeFor"
+                placeholder="Troco para (R$)"
+                step="0.01"
+                class="w-40 text-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
               />
             </div>
           </div>
@@ -297,9 +337,11 @@ const order = ref({
   channel: CHANNELS.PDV,
   serviceType: SERVICE_TYPES.CONSUMO_LOCAL,
   source: "PDV_CAIXA",
-  customer: { id: null, name: "", address: "" },
+  customer: { id: null, name: "", address: "", phone: "", complement: "", reference: "" },
   items: [],
   paymentMethod: "pix",
+  notes: "",
+  cashChangeFor: null,
 });
 
 const serviceOptions = computed(
@@ -378,6 +420,9 @@ const selectCustomer = (customer) => {
   order.value.customer.id = customer.id;
   order.value.customer.name = customer.name;
   order.value.customer.address = customer.address || "";
+  order.value.customer.phone = customer.phone || "";
+  order.value.customer.complement = customer.complement || "";
+  order.value.customer.reference = customer.reference || "";
   customerSearchQuery.value = customer.name;
   showCustomerDropdown.value = false;
   customerSuggestions.value = [];
@@ -387,6 +432,9 @@ const clearCustomerSelection = () => {
   order.value.customer.id = null;
   order.value.customer.name = "";
   order.value.customer.address = "";
+  order.value.customer.phone = "";
+  order.value.customer.complement = "";
+  order.value.customer.reference = "";
   customerSearchQuery.value = "";
   customerSuggestions.value = [];
 };
@@ -410,6 +458,11 @@ onMounted(async () => {
         order.value.customer.id = found.customerId || null;
         order.value.customer.name = found.customerName || "";
         order.value.customer.address = found.customerAddress || "";
+        order.value.customer.phone = found.customerPhone || "";
+        order.value.customer.complement = found.customerAddressComplement || "";
+        order.value.customer.reference = found.customerAddressReference || "";
+        order.value.notes = found.notes || "";
+        order.value.cashChangeFor = found.cashChangeFor || null;
         customerSearchQuery.value = found.customerName || "";
 
         originalTotal.value = found.totalValue || 0;
@@ -658,6 +711,9 @@ const placeOrder = async () => {
       id: order.value.customer.id || null,
       name: order.value.customer.name || customerSearchQuery.value,
       address: order.value.customer.address,
+      phone: order.value.customer.phone,
+      complement: order.value.customer.complement,
+      reference: order.value.customer.reference,
     };
 
     if (isEditMode.value) {
@@ -670,6 +726,8 @@ const placeOrder = async () => {
         customer: customerInfo,
         paymentMethod: order.value.paymentMethod.toUpperCase(),
         newItems: orderItemsDto,
+        notes: order.value.notes,
+        cashChangeFor: order.value.cashChangeFor,
       };
       await orderService.update(editOrderId.value, updateData);
       notify({ type: "success", message: "Pedido atualizado com sucesso!" });
@@ -684,6 +742,8 @@ const placeOrder = async () => {
         paymentMethod: order.value.paymentMethod.toUpperCase(),
         items: orderItemsDto,
         deliveryCost: deliveryCost.value,
+        notes: order.value.notes,
+        cashChangeFor: order.value.cashChangeFor,
       };
       await orderService.create(createData);
       notify({ type: "success", message: "Pedido criado com sucesso!" });
