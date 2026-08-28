@@ -263,6 +263,7 @@ import { orderService } from "@/services/orderService";
 import { productService } from "@/services/productService";
 import { modifierGroupService } from "@/services/modifierGroupService";
 import { customerService } from "@/services/customerService";
+import { confirmAction, notify } from "@/services/notificationService";
 import {
   OPERATIONS,
   CHANNELS,
@@ -418,7 +419,7 @@ onMounted(async () => {
       }
     } catch (error) {
       console.error("Erro ao carregar pedido:", error);
-      alert("Erro ao carregar pedido.");
+      notify({ type: "error", message: "Erro ao carregar pedido." });
       router.push("/pedidos");
     }
   }
@@ -471,7 +472,10 @@ const loadCatalog = async () => {
     allModifierGroups.value = modGroups;
   } catch (error) {
     console.error("Erro ao carregar catálogo:", error);
-    alert("Erro ao carregar produtos. Verifique se o backend está rodando.");
+    notify({
+      type: "error",
+      message: "Erro ao carregar produtos. Verifique se o backend está rodando.",
+    });
   } finally {
     loadingProducts.value = false;
   }
@@ -497,9 +501,35 @@ const selectedProductForModal = ref(null);
 const itemToEdit = ref(null);
 const editItemIndex = ref(-1);
 
+const productAllowsCustomization = (product) =>
+  Boolean(
+    product?.modifierGroupIds?.length ||
+      product?.modifierGroups?.length ||
+      product?.removableItems?.length,
+  );
+
+const addProductWithoutCustomization = (product) => {
+  order.value.items.push({
+    cartItemId: `${product.id}-${Date.now()}`,
+    product,
+    quantity: 1,
+    modifiers: [],
+    removals: [],
+    observation: "",
+    extraPrice: 0,
+    totalPrice: product.price || 0,
+  });
+};
+
 const openCustomizationModal = (product) => {
   editItemIndex.value = -1;
   itemToEdit.value = null;
+
+  if (!productAllowsCustomization(product)) {
+    addProductWithoutCustomization(product);
+    return;
+  }
+
   selectedProductForModal.value = product;
   showCustomizationModal.value = true;
 };
@@ -517,19 +547,23 @@ const editItemFromOrder = (index) => {
   showCustomizationModal.value = true;
 };
 
+const normalizeCustomizedItems = (customizedItem) =>
+  Array.isArray(customizedItem) ? customizedItem : [customizedItem];
+
 const onModalConfirm = (customizedItem) => {
+  const customizedItems = normalizeCustomizedItems(customizedItem).map(
+    (item) => ({
+      ...item,
+      observation: item.observation || "",
+    }),
+  );
+
   if (editItemIndex.value !== -1) {
-    order.value.items[editItemIndex.value] = {
-      ...customizedItem,
-      observation: customizedItem.observation || "",
-    };
+    order.value.items.splice(editItemIndex.value, 1, ...customizedItems);
     editItemIndex.value = -1;
     itemToEdit.value = null;
   } else {
-    order.value.items.push({
-      ...customizedItem,
-      observation: customizedItem.observation || "",
-    });
+    order.value.items.push(...customizedItems);
   }
 };
 
@@ -565,12 +599,14 @@ const totalOrderPrice = computed(
 );
 
 // ── Ações do Pedido ──
-const cancelOrder = () => {
-  if (
-    confirm(
-      "Tem certeza que deseja cancelar este pedido? Todas as informações serão perdidas.",
-    )
-  ) {
+const cancelOrder = async () => {
+  const confirmed = await confirmAction({
+    title: "Cancelar pedido?",
+    message: "Todas as informações preenchidas serão perdidas. Deseja continuar?",
+    confirmLabel: "Sim, cancelar",
+  });
+
+  if (confirmed) {
     router.push({ name: "pedidos" });
   }
 };
@@ -582,12 +618,20 @@ const requestOrderConfirmation = () => {
     order.value.serviceType === SERVICE_TYPES.ENTREGA &&
     !order.value.customer.address
   ) {
-    alert("Por favor, informe o endereço de entrega.");
+    notify({
+      type: "warning",
+      title: "Endereço obrigatório",
+      message: "Por favor, informe o endereço de entrega.",
+    });
     return;
   }
   // Em modo edição, permite salvar mesmo sem adicionar novos itens (mantém os originais)
   if (!isEditMode.value && order.value.items.length === 0) {
-    alert("Adicione pelo menos um item ao pedido.");
+    notify({
+      type: "warning",
+      title: "Pedido sem itens",
+      message: "Adicione pelo menos um item ao pedido.",
+    });
     return;
   }
   showConfirmationModal.value = true;
@@ -607,7 +651,7 @@ const placeOrder = async () => {
           groupId: m.groupId,
           optionId: m.optionId,
         })) || [],
-      removalIds: item.removals?.map((r) => r.id) || [],
+      removalIds: item.removals?.map((r) => r.id || r.ingredientId) || [],
     }));
 
     const customerInfo = {
@@ -628,7 +672,7 @@ const placeOrder = async () => {
         newItems: orderItemsDto,
       };
       await orderService.update(editOrderId.value, updateData);
-      alert("Pedido atualizado com sucesso!");
+      notify({ type: "success", message: "Pedido atualizado com sucesso!" });
     } else {
       const createData = {
         type: inferLegacyType(order.value),
@@ -642,14 +686,14 @@ const placeOrder = async () => {
         deliveryCost: deliveryCost.value,
       };
       await orderService.create(createData);
-      alert("Pedido criado com sucesso!");
+      notify({ type: "success", message: "Pedido criado com sucesso!" });
     }
 
     router.push({ name: "pedidos" });
   } catch (error) {
     console.error("Erro ao salvar pedido:", error);
     const msg = error.response?.data?.message || "Erro ao salvar pedido.";
-    alert(msg);
+    notify({ type: "error", title: "Erro ao salvar pedido", message: msg });
   } finally {
     loading.value = false;
   }

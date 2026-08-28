@@ -4,7 +4,7 @@
     <Transition name="modal-fade">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+        class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-2 overflow-x-hidden"
         @click.self="handleCancel"
       >
         <!-- Backdrop -->
@@ -17,16 +17,16 @@
         <Transition name="modal-slide">
           <div
             v-if="modelValue"
-            class="relative w-full sm:max-w-2xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200/60"
-            style="max-height: min(92vh, 680px)"
+            class="relative w-full sm:max-w-6xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200/60 min-w-0"
+            style="max-height: calc(100dvh - 1rem)"
           >
             <!-- ── Header compacto ── -->
             <div
-              class="relative shrink-0 flex items-center gap-4 px-5 py-4 bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-700"
+              class="relative shrink-0 flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-4 bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-700 min-w-0"
             >
               <!-- Thumbnail -->
               <div
-                class="w-16 h-16 rounded-2xl overflow-hidden bg-gradient-to-br from-orange-400 to-amber-500 shrink-0"
+                class="hidden sm:block w-16 h-16 rounded-2xl overflow-hidden bg-gradient-to-br from-orange-400 to-amber-500 shrink-0"
               >
                 <img
                   v-if="product?.imageUrl"
@@ -76,14 +76,14 @@
             </div>
 
             <!-- ── Corpo: duas colunas (esq: opções / dir: remoções + obs) ── -->
-            <div class="flex flex-1 min-h-0 overflow-hidden">
+            <div class="flex flex-col lg:flex-row flex-1 min-h-0 min-w-0 overflow-y-auto lg:overflow-hidden overflow-x-hidden">
               <!-- Coluna esquerda: modificadores + quantidade -->
               <div
-                class="flex-1 overflow-y-auto px-5 py-4 space-y-5 custom-scroll border-r border-slate-100"
+                class="flex-1 min-w-0 lg:overflow-y-auto px-4 sm:px-5 py-4 grid grid-cols-1 xl:grid-cols-2 content-start gap-4 lg:border-r border-slate-100"
               >
                 <!-- Quantidade -->
                 <div
-                  class="flex items-center justify-between bg-slate-50 rounded-2xl px-4 py-3 border border-slate-200"
+                  class="xl:col-span-2 flex items-center justify-between bg-slate-50 rounded-2xl px-4 py-3 border border-slate-200"
                 >
                   <div class="flex items-center gap-2">
                     <Hash :size="15" class="text-orange-500" />
@@ -111,9 +111,28 @@
                   </div>
                 </div>
 
+                <div
+                  v-if="quantity > 1"
+                  class="xl:col-span-2 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2"
+                >
+                  <button
+                    v-for="(_, index) in unitConfigs"
+                    :key="index"
+                    @click="selectUnit(index)"
+                    :class="[
+                      'px-3 py-2 rounded-xl text-xs font-black border transition-all',
+                      currentUnitIndex === index
+                        ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300',
+                    ]"
+                  >
+                    Item {{ index + 1 }}
+                  </button>
+                </div>
+
                 <!-- Grupos de Modificadores -->
                 <template v-for="group in activeModifierGroups" :key="group.id">
-                  <div class="space-y-2">
+                  <div class="min-w-0 space-y-2 rounded-2xl border border-slate-100 bg-white p-3">
                     <div class="flex items-center justify-between">
                       <div class="flex items-center gap-1.5">
                         <span class="text-base leading-none">{{
@@ -149,7 +168,7 @@
                     <!-- Radio -->
                     <div
                       v-if="group.type === 'radio'"
-                      class="grid grid-cols-1 gap-1.5"
+                      class="grid grid-cols-1 sm:grid-cols-2 gap-1.5"
                     >
                       <label
                         v-for="option in group.options"
@@ -196,7 +215,7 @@
                     <!-- Checkbox -->
                     <div
                       v-else-if="group.type === 'checkbox'"
-                      class="grid grid-cols-1 gap-1.5"
+                      class="grid grid-cols-1 sm:grid-cols-2 gap-1.5"
                     >
                       <label
                         v-for="option in group.options"
@@ -246,7 +265,7 @@
                 <!-- Placeholder quando não há modificadores -->
                 <div
                   v-if="activeModifierGroups.length === 0"
-                  class="text-center py-4 text-slate-400"
+                  class="xl:col-span-2 text-center py-4 text-slate-400"
                 >
                   <UtensilsCrossed :size="28" class="mx-auto mb-2 opacity-30" />
                   <p class="text-xs font-medium">Nenhuma opção disponível</p>
@@ -255,7 +274,7 @@
 
               <!-- Coluna direita: remoções + observação -->
               <div
-                class="w-52 shrink-0 overflow-y-auto px-4 py-4 space-y-5 custom-scroll bg-slate-50/60"
+                class="w-full lg:w-72 shrink-0 lg:overflow-y-auto px-4 py-4 space-y-5 bg-slate-50/60 border-t lg:border-t-0 border-slate-100"
               >
                 <!-- Remoções -->
                 <div v-if="removableIngredients.length > 0" class="space-y-2">
@@ -366,33 +385,33 @@
 
             <!-- ── Rodapé com total e botões ── -->
             <div
-              class="shrink-0 px-5 py-4 border-t border-slate-100 bg-white flex items-center gap-3"
+              class="shrink-0 px-4 sm:px-5 py-3 sm:py-4 border-t border-slate-100 bg-white grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-3"
             >
               <!-- Subtotal visível -->
-              <div class="flex-1">
-                <p class="text-[10px] text-slate-400 font-medium">
-                  Total do item
+              <div class="col-span-2 sm:flex-1">
+                  <p class="text-[10px] text-slate-400 font-medium">
+                  {{ quantity > 1 ? "Total dos itens" : "Total do item" }}
                 </p>
                 <p class="text-lg font-black text-slate-800">
-                  R$ {{ (totalItemPrice * quantity).toFixed(2) }}
+                  R$ {{ totalOrderItemPrice.toFixed(2) }}
                   <span
                     v-if="quantity > 1"
                     class="text-xs font-medium text-slate-400"
                   >
-                    ({{ quantity }}x R$ {{ totalItemPrice.toFixed(2) }})
+                    ({{ quantity }} unidades configuráveis)
                   </span>
                 </p>
               </div>
 
               <button
                 @click="handleCancel"
-                class="px-5 py-3 rounded-2xl border-2 border-slate-200 text-slate-500 font-bold text-sm hover:bg-slate-50 transition-all"
+                class="w-full sm:w-auto px-4 sm:px-5 py-3 rounded-2xl border-2 border-slate-200 text-slate-500 font-bold text-sm hover:bg-slate-50 transition-all"
               >
                 Cancelar
               </button>
               <button
                 @click="handleConfirm"
-                class="px-6 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-black text-sm shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
+                class="w-full sm:w-auto px-4 sm:px-6 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-black text-sm shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
               >
                 <ShoppingBag :size="16" />
                 Adicionar {{ quantity > 1 ? quantity + "x" : "" }} ao Pedido
@@ -428,12 +447,64 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue", "confirm", "cancel"]);
 
 // ── Estado interno das seleções ──
-const selectedRadio = ref({});
-const selectedCheckboxes = ref({});
-const selectedRemovals = ref([]);
 const validationErrors = ref({});
 const quantity = ref(1);
-const observation = ref("");
+const currentUnitIndex = ref(0);
+const unitConfigs = ref([]);
+
+const createEmptyConfig = () => ({
+  selectedRadio: {},
+  selectedCheckboxes: {},
+  selectedRemovals: [],
+  observation: "",
+});
+
+const cloneConfig = (config) => ({
+  selectedRadio: { ...(config?.selectedRadio || {}) },
+  selectedCheckboxes: Object.fromEntries(
+    Object.entries(config?.selectedCheckboxes || {}).map(([key, value]) => [
+      key,
+      [...value],
+    ]),
+  ),
+  selectedRemovals: [...(config?.selectedRemovals || [])],
+  observation: config?.observation || "",
+});
+
+const ensureUnitConfigs = (targetQuantity, templateConfig = null) => {
+  const normalizedQuantity = Math.max(1, Number(targetQuantity) || 1);
+
+  while (unitConfigs.value.length < normalizedQuantity) {
+    unitConfigs.value.push(
+      templateConfig ? cloneConfig(templateConfig) : createEmptyConfig(),
+    );
+  }
+
+  if (unitConfigs.value.length > normalizedQuantity) {
+    unitConfigs.value.splice(normalizedQuantity);
+  }
+
+  if (currentUnitIndex.value > unitConfigs.value.length - 1) {
+    currentUnitIndex.value = unitConfigs.value.length - 1;
+  }
+};
+
+const currentConfig = computed(() => {
+  if (!unitConfigs.value[currentUnitIndex.value]) {
+    unitConfigs.value[currentUnitIndex.value] = createEmptyConfig();
+  }
+  return unitConfigs.value[currentUnitIndex.value];
+});
+
+const selectedRadio = computed(() => currentConfig.value.selectedRadio);
+const selectedCheckboxes = computed(() => currentConfig.value.selectedCheckboxes);
+const selectedRemovals = computed(() => currentConfig.value.selectedRemovals);
+const observation = computed({
+  get: () => currentConfig.value.observation,
+  set: (value) => {
+    currentConfig.value.observation = value;
+  },
+});
 
 // Reset estado ao abrir o modal com um novo produto ou item a editar
 watch(
@@ -442,13 +513,12 @@ watch(
     if (isOpen) {
       if (props.initialItem) {
         quantity.value = props.initialItem.quantity || 1;
-        observation.value = props.initialItem.observation || "";
-        selectedRemovals.value = (props.initialItem.removals || []).map(
+        const config = createEmptyConfig();
+        config.observation = props.initialItem.observation || "";
+        config.selectedRemovals = (props.initialItem.removals || []).map(
           (r) => r.id || r.ingredientId,
         );
 
-        const newRadio = {};
-        const newCheckboxes = {};
         (props.initialItem.modifiers || []).forEach((mod) => {
           const group =
             activeModifierGroups.value.find((g) => g.id === mod.groupId) ||
@@ -456,22 +526,22 @@ watch(
           if (group) {
             const type = group.type?.toLowerCase() || "radio";
             if (type === "radio") {
-              newRadio[mod.groupId] = mod.optionId;
+              config.selectedRadio[mod.groupId] = mod.optionId;
             } else if (type === "checkbox") {
-              if (!newCheckboxes[mod.groupId]) newCheckboxes[mod.groupId] = [];
-              newCheckboxes[mod.groupId].push(mod.optionId);
+              if (!config.selectedCheckboxes[mod.groupId]) {
+                config.selectedCheckboxes[mod.groupId] = [];
+              }
+              config.selectedCheckboxes[mod.groupId].push(mod.optionId);
             }
           }
         });
-        selectedRadio.value = newRadio;
-        selectedCheckboxes.value = newCheckboxes;
+        unitConfigs.value = [];
+        ensureUnitConfigs(quantity.value, config);
       } else {
-        selectedRadio.value = {};
-        selectedCheckboxes.value = {};
-        selectedRemovals.value = [];
         quantity.value = 1;
-        observation.value = "";
+        unitConfigs.value = [createEmptyConfig()];
       }
+      currentUnitIndex.value = 0;
       validationErrors.value = {};
     }
   },
@@ -480,16 +550,50 @@ watch(
 // ── Controle de quantidade ──
 const increaseQty = () => {
   quantity.value++;
+  ensureUnitConfigs(quantity.value, currentConfig.value);
 };
 const decreaseQty = () => {
-  if (quantity.value > 1) quantity.value--;
+  if (quantity.value > 1) {
+    quantity.value--;
+    ensureUnitConfigs(quantity.value);
+  }
+};
+
+const selectUnit = (index) => {
+  currentUnitIndex.value = index;
+  validationErrors.value = {};
 };
 
 // ── Grupos de modificadores ativos para este produto ──
 const activeModifierGroups = computed(() => {
-  if (!props.product?.modifierGroupIds?.length) return [];
-  return props.allModifierGroups
-    .filter((g) => props.product.modifierGroupIds.includes(g.id))
+  const productGroups = props.product?.modifierGroups || [];
+  const groupIds = [
+    ...(props.product?.modifierGroupIds || []),
+    ...productGroups.map((group) => group.id).filter(Boolean),
+  ];
+  const uniqueGroupIds = [...new Set(groupIds)];
+  if (uniqueGroupIds.length === 0) return [];
+
+  const groupsById = new Map(
+    [...props.allModifierGroups, ...productGroups].map((group) => [
+      group.id,
+      group,
+    ]),
+  );
+
+  const normalizeName = (name = "") =>
+    name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  const priority = (group) =>
+    normalizeName(group.name).includes("ponto da carne") ? 0 : 1;
+
+  const groups = uniqueGroupIds
+    .map((id) => groupsById.get(id))
+    .filter(Boolean)
+    .sort((a, b) => priority(a) - priority(b));
+
+  return groups
+    .filter((g) => g.active !== false)
     .map((g) => ({ ...g, type: g.type?.toLowerCase() || "radio" }));
 });
 
@@ -526,17 +630,17 @@ const toggleCheckbox = (groupId, optionId) => {
 };
 
 // ── Cálculo do total de adicionais ──
-const additionalsTotal = computed(() => {
+const calculateAdditionalsTotal = (config) => {
   let total = 0;
   for (const group of activeModifierGroups.value) {
     if (group.type === "radio") {
-      const optId = selectedRadio.value[group.id];
+      const optId = config.selectedRadio[group.id];
       if (optId) {
         const opt = group.options.find((o) => o.id === optId);
         if (opt?.price) total += opt.price;
       }
     } else if (group.type === "checkbox") {
-      const selected = selectedCheckboxes.value[group.id] || [];
+      const selected = config.selectedCheckboxes[group.id] || [];
       for (const optId of selected) {
         const opt = group.options.find((o) => o.id === optId);
         if (opt?.price) total += opt.price;
@@ -544,15 +648,27 @@ const additionalsTotal = computed(() => {
     }
   }
   return total;
-});
+};
+
+const additionalsTotal = computed(() =>
+  calculateAdditionalsTotal(currentConfig.value),
+);
 
 // ── Preço total do item com adicionais (unitário) ──
 const totalItemPrice = computed(() => {
   return (props.product?.price || 0) + additionalsTotal.value;
 });
 
+const totalOrderItemPrice = computed(() =>
+  unitConfigs.value.reduce(
+    (total, config) =>
+      total + (props.product?.price || 0) + calculateAdditionalsTotal(config),
+    0,
+  ),
+);
+
 // ── Validação dos grupos obrigatórios ──
-const validate = () => {
+const validateCurrentConfig = () => {
   validationErrors.value = {};
   let valid = true;
   for (const group of activeModifierGroups.value) {
@@ -575,8 +691,8 @@ const validate = () => {
 };
 
 // ── Handlers ──
-const handleConfirm = () => {
-  if (!validate()) return;
+const handleConfirmSingle = () => {
+  if (!validateCurrentConfig()) return;
 
   const chosenModifiers = [];
 
@@ -624,6 +740,103 @@ const handleConfirm = () => {
   };
 
   emit("confirm", customizedItem);
+  emit("update:modelValue", false);
+};
+
+const validate = () => {
+  validationErrors.value = {};
+  let valid = true;
+  let firstInvalidIndex = -1;
+
+  unitConfigs.value.forEach((config, index) => {
+    const errors = {};
+
+    for (const group of activeModifierGroups.value) {
+      if (!group.required) continue;
+
+      if (group.type === "radio" && !config.selectedRadio[group.id]) {
+        errors[group.id] = `Selecione uma opcao para "${group.name}"`;
+        valid = false;
+      }
+
+      if (group.type === "checkbox") {
+        const count = (config.selectedCheckboxes[group.id] || []).length;
+        if (count < group.minSelections) {
+          errors[group.id] =
+            `Selecione ao menos ${group.minSelections} opcao(oes) em "${group.name}"`;
+          valid = false;
+        }
+      }
+    }
+
+    if (Object.keys(errors).length && firstInvalidIndex === -1) {
+      firstInvalidIndex = index;
+      validationErrors.value = errors;
+    }
+  });
+
+  if (firstInvalidIndex !== -1) {
+    currentUnitIndex.value = firstInvalidIndex;
+  }
+
+  return valid;
+};
+
+const buildCustomizedUnit = (config, index) => {
+  const chosenModifiers = [];
+
+  for (const group of activeModifierGroups.value) {
+    if (group.type === "radio") {
+      const optId = config.selectedRadio[group.id];
+      if (optId) {
+        const opt = group.options.find((o) => o.id === optId);
+        chosenModifiers.push({
+          groupId: group.id,
+          groupName: group.name,
+          optionId: opt.id,
+          optionName: opt.name,
+          price: opt.price,
+        });
+      }
+    }
+
+    if (group.type === "checkbox") {
+      const selected = config.selectedCheckboxes[group.id] || [];
+      for (const optId of selected) {
+        const opt = group.options.find((o) => o.id === optId);
+        chosenModifiers.push({
+          groupId: group.id,
+          groupName: group.name,
+          optionId: opt.id,
+          optionName: opt.name,
+          price: opt.price,
+        });
+      }
+    }
+  }
+
+  const removals = removableIngredients.value.filter((i) =>
+    config.selectedRemovals.includes(i.ingredientId || i.id),
+  );
+  const extraPrice = calculateAdditionalsTotal(config);
+
+  return {
+    cartItemId: `${props.product.id}-${Date.now()}-${index}`,
+    product: props.product,
+    quantity: 1,
+    modifiers: chosenModifiers,
+    removals,
+    observation: config.observation,
+    extraPrice,
+    totalPrice: (props.product?.price || 0) + extraPrice,
+  };
+};
+
+const handleConfirm = () => {
+  if (!validate()) return;
+
+  const customizedItems = unitConfigs.value.map(buildCustomizedUnit);
+  emit("confirm", quantity.value > 1 ? customizedItems : customizedItems[0]);
   emit("update:modelValue", false);
 };
 

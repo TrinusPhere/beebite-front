@@ -13,13 +13,17 @@ import {
   User,
   FileText, // Ícone NF-e
   MessageSquare,
+  Eye,
 } from "lucide-vue-next";
 import BaseButton from "@/components/BaseButton.vue";
 import ChatDrawer from "@/components/ChatDrawer.vue";
+import GeneralChatDrawer from "@/components/GeneralChatDrawer.vue";
+import OrderDetailsModal from "@/components/OrderDetailsModal.vue";
 import { orderService } from "@/services/orderService";
 import { driverService } from "@/services/driverService";
 import { integrationService } from "@/services/integrationService";
 import { chatService } from "@/services/chatService";
+import { confirmAction, notify } from "@/services/notificationService";
 import {
   OPERATIONS,
   normalizeOrderContext,
@@ -33,6 +37,30 @@ const activeOperations = ref([OPERATIONS.SALAO, OPERATIONS.DELIVERY]);
 const openMenuId = ref(null);
 
 const columns = ref([]);
+const showOrderDetails = ref(false);
+const selectedOrderDetails = ref(null);
+const loadingOrderDetails = ref(false);
+
+const openOrderDetails = async (order) => {
+  openMenuId.value = null;
+  selectedOrderDetails.value = order;
+  showOrderDetails.value = true;
+  loadingOrderDetails.value = true;
+  try {
+    selectedOrderDetails.value = await orderService.getById(order.id);
+  } catch (error) {
+    console.error("Erro ao carregar detalhes do pedido:", error);
+    notify({ type: "error", message: "Não foi possível carregar os detalhes do pedido." });
+    showOrderDetails.value = false;
+  } finally {
+    loadingOrderDetails.value = false;
+  }
+};
+
+const closeOrderDetails = () => {
+  showOrderDetails.value = false;
+  selectedOrderDetails.value = null;
+};
 
 const fetchKanban = async () => {
   try {
@@ -64,6 +92,7 @@ const formatTime = (isoString) => {
 
 // --- Chat vinculado diretamente ao pedido ---
 const showChatDrawer = ref(false);
+const showGeneralChat = ref(false);
 const selectedOrderForChat = ref(null);
 const integrations = ref({ whatsapp: {}, ifood: {} });
 const conversations = ref([]);
@@ -80,30 +109,19 @@ const loadChatContext = async () => {
     console.error("Erro ao carregar contexto de chat:", error);
   }
 };
-const isIntegrationConnected = (channel) => {
-  if (channel === "WHATSAPP") {
-    const wa = integrations.value?.whatsapp || {};
-    return (
-      ["connected", "configured"].includes(
-        String(wa.status || "").toLowerCase(),
-      ) || Boolean(wa.phoneNumber && wa.businessAccountId)
-    );
-  }
-  if (channel === "IFOOD")
-    return ["connected", "configured"].includes(
-      String(integrations.value?.ifood?.status || "").toLowerCase(),
-    );
-  return false;
-};
-const hasChatIntegration = (order) =>
-  isDeliveryOrder(order) &&
-  (isIntegrationConnected("WHATSAPP") || isIntegrationConnected("IFOOD"));
+const getDriverName = (order) => order?.driverName || order?.driver || "";
 const unreadMessagesForOrder = (order) => {
   const oid = String(order?.id ?? "").replace(/^#/, "");
   return conversations.value
     .filter((c) => String(c.orderId ?? "").replace(/^#/, "") === oid)
     .reduce((t, c) => t + Number(c.unread || 0), 0);
 };
+const totalUnreadMessages = computed(() =>
+  conversations.value.reduce(
+    (total, conversation) => total + Number(conversation.unread || 0),
+    0,
+  ),
+);
 const openOrderChat = (order) => {
   selectedOrderForChat.value = order;
   showChatDrawer.value = true;
@@ -120,18 +138,31 @@ const toggleMenu = (id) => {
   openMenuId.value = openMenuId.value === id ? null : id;
 };
 
-const deleteOrder = async (id, colIndex) => {
-  if (confirm("Tem certeza que deseja excluir este pedido?")) {
-    try {
-      await orderService.delete(id);
-      columns.value[colIndex].orders = columns.value[colIndex].orders.filter(
-        (o) => o.id !== id,
-      );
-      openMenuId.value = null;
-    } catch (error) {
-      console.error("Erro ao deletar pedido:", error);
-      alert("Erro ao excluir pedido.");
-    }
+const canCancelOrder = (order, columnId = "") =>
+  !["EM_ROTA", "FINALIZADO", "CANCELADO"].includes(
+    String(order?.status || columnId).toUpperCase(),
+  );
+
+const cancelOrder = async (order, columnId) => {
+  if (!canCancelOrder(order, columnId)) return;
+
+  const confirmed = await confirmAction({
+    title: "Cancelar pedido?",
+    message: "O pedido será cancelado e permanecerá registrado no histórico.",
+    confirmLabel: "Sim, cancelar",
+  });
+  if (!confirmed) return;
+
+  try {
+    await orderService.cancel(order.id);
+    await fetchKanban();
+    openMenuId.value = null;
+  } catch (error) {
+    console.error("Erro ao cancelar pedido:", error);
+    notify({
+      type: "error",
+      message: error.response?.data?.message || "Erro ao cancelar pedido.",
+    });
   }
 };
 
@@ -274,7 +305,7 @@ const onDrop = (event, toColIndex) => {
 
   // Lógica de avaliação ao finalizar
   if (toColumn.id === "finalizado") {
-    const driverName = order.driver || "Não aplicável (Balcão)";
+    const driverName = getDriverName(order) || "Não aplicável (Balcão)";
     setTimeout(() => {
       alert(
         `Mensagem automática enviada via WhatsApp para o cliente ${order.customerName} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`,
@@ -428,7 +459,7 @@ const moveOrder = (orderId, currentColumnIndex) => {
 
       // Se moveu para finalizado, disparar solicitação de avaliação
       if (targetColIndex === finalizadoColumnIndex) {
-        const driverName = order.driver || "Não aplicável (Balcão)";
+        const driverName = getDriverName(order) || "Não aplicável (Balcão)";
         // Simulação do envio de mensagem de avaliação
         setTimeout(() => {
           alert(
@@ -773,6 +804,12 @@ const emitirNFe = (order) => {
                         class="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1"
                       >
                         <button
+                          @click.stop="openOrderDetails(order)"
+                          class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                        >
+                          <Eye :size="14" class="text-orange-500" /> Detalhes do pedido
+                        </button>
+                        <button
                           v-if="['ANALISE', 'PREPARO'].includes(order.status)"
                           @click.stop="editOrder(order.id)"
                           class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
@@ -795,10 +832,21 @@ const emitirNFe = (order) => {
                           Avançar Status
                         </button>
                         <button
-                          @click="deleteOrder(order.id, colIndex)"
-                          class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors"
+                          @click="cancelOrder(order, column.id)"
+                          :disabled="!canCancelOrder(order, column.id)"
+                          :title="
+                            canCancelOrder(order, column.id)
+                              ? 'Cancelar pedido'
+                              : 'Pedidos em rota ou finalizados não podem ser cancelados'
+                          "
+                          :class="[
+                            'w-full flex items-center gap-2 px-3 py-2 text-xs font-bold transition-colors',
+                            canCancelOrder(order, column.id)
+                              ? 'text-red-600 hover:bg-red-50'
+                              : 'text-slate-300 cursor-not-allowed bg-slate-50',
+                          ]"
                         >
-                          <Trash2 :size="14" /> Excluir
+                          <Trash2 :size="14" /> Cancelar pedido
                         </button>
                       </div>
                     </transition>
@@ -826,6 +874,16 @@ const emitirNFe = (order) => {
                     class="px-2 py-1 bg-blue-100 text-blue-600 rounded-md text-[10px] font-black uppercase tracking-widest flex items-center gap-1"
                   >
                     <Bike :size="10" /> Delivery
+                  </div>
+                  <div
+                    v-if="
+                      normalizeOrderContext(order).operation ===
+                        OPERATIONS.DELIVERY && getDriverName(order)
+                    "
+                    class="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-black uppercase tracking-wide flex items-center gap-1"
+                    :title="`Entregador: ${getDriverName(order)}`"
+                  >
+                    <Bike :size="10" /> {{ getDriverName(order) }}
                   </div>
                   <span
                     class="px-2 py-1 bg-slate-100 text-slate-500 rounded-md text-[9px] font-black uppercase"
@@ -859,7 +917,6 @@ const emitirNFe = (order) => {
 
                 <div class="flex items-center gap-1.5">
                   <button
-                    v-if="hasChatIntegration(order)"
                     @click.stop="openOrderChat(order)"
                     class="relative px-2 py-1 bg-white hover:bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black transition-all flex items-center gap-1 border border-blue-200 hover:border-blue-300"
                     title="Abrir chats deste pedido"
@@ -936,6 +993,32 @@ const emitirNFe = (order) => {
       :integrations="integrations"
       @close="closeChat"
       @updated="handleChatUpdated"
+    />
+
+    <button
+      @click="showGeneralChat = true"
+      class="fixed right-5 bottom-5 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-xl shadow-orange-500/30 hover:scale-105 transition-transform flex items-center justify-center"
+      title="Abrir central de conversas"
+      aria-label="Abrir central de conversas"
+    >
+      <MessageSquare :size="24" />
+      <span
+        v-if="totalUnreadMessages > 0"
+        class="absolute -top-1 -right-1 min-w-6 h-6 px-1 rounded-full bg-red-500 border-2 border-white text-white text-[10px] font-black flex items-center justify-center"
+      >{{ totalUnreadMessages }}</span>
+    </button>
+
+    <GeneralChatDrawer
+      :show="showGeneralChat"
+      @close="showGeneralChat = false"
+      @updated="handleChatUpdated"
+    />
+
+    <OrderDetailsModal
+      :show="showOrderDetails"
+      :order="selectedOrderDetails"
+      :loading="loadingOrderDetails"
+      @close="closeOrderDetails"
     />
   </div>
 </template>

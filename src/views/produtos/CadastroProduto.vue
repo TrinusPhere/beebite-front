@@ -22,6 +22,7 @@ import { ingredientService } from "@/services/ingredientService";
 import { modifierGroupService } from "@/services/modifierGroupService";
 import categoryService from "@/services/categoryService";
 import { productionSectorService } from "@/services/productionSectorService";
+import { formatCurrencyInput, parseCurrencyInput } from "@/utils/money";
 
 const router = useRouter();
 const route = useRoute();
@@ -434,11 +435,9 @@ const saveNewIngredient = async () => {
 };
 
 const handlePriceInput = (event) => {
-  const value = event.target.value.replace(/\D/g, "");
-
-  form.price = Number(value) / 100;
-
-  event.target.value = formatPrice(form.price);
+  const hasDigits = /\d/.test(event.target.value);
+  form.price = parseCurrencyInput(event.target.value);
+  event.target.value = hasDigits ? formatPrice(form.price) : "";
 };
 
 const formatCurrency = (value) => {
@@ -573,39 +572,13 @@ const handleNewIngredientUnitChange = () => {
     }
   }
 };
-const formatPrice = (value) => {
-  if (value === null || value === undefined || value === "") {
-    return "";
-  }
-
-  return Number(value).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-};
-const formatNewIngredientCost = (value) => {
-  if (value === null || value === undefined || value === "") {
-    return "";
-  }
-
-  return Number(value).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-};
+const formatPrice = formatCurrencyInput;
+const formatNewIngredientCost = formatCurrencyInput;
 
 const handleNewIngredientCost = (event) => {
-  const digits = event.target.value.replace(/\D/g, "");
-
-  if (!digits) {
-    newIngredient.costPrice = 0;
-    event.target.value = "";
-    return;
-  }
-
-  newIngredient.costPrice = Number(digits) / 100;
-
-  event.target.value = formatNewIngredientCost(newIngredient.costPrice);
+  const hasDigits = /\d/.test(event.target.value);
+  newIngredient.costPrice = parseCurrencyInput(event.target.value);
+  event.target.value = hasDigits ? formatNewIngredientCost(newIngredient.costPrice) : "";
 };
 </script>
 

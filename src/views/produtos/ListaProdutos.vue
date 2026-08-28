@@ -368,9 +368,9 @@ const removeProduct = async (id) => {
     <!-- Modal de Configuração de Categoria -->
     <div
       v-if="showCategorySettings"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-x-hidden"
     >
-      <div class="bg-white p-6 rounded-3xl shadow-xl w-full max-w-lg">
+      <div class="bg-white p-4 sm:p-6 rounded-3xl shadow-xl w-full max-w-4xl max-h-[calc(100dvh-1rem)] overflow-y-auto overflow-x-hidden">
         <h3 class="text-xl font-bold text-slate-800 mb-2">
           Configurar Categoria
         </h3>
@@ -380,7 +380,7 @@ const removeProduct = async (id) => {
           >.
         </p>
 
-        <div class="space-y-4 max-h-[50vh] overflow-y-auto mb-6 pr-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
           <label
             v-for="group in modifierGroups"
             :key="group.id"

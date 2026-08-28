@@ -4,6 +4,7 @@ import { useRouter, useRoute } from "vue-router";
 import { Save, X, Bike, ChevronLeft } from "lucide-vue-next";
 import BaseButton from "@/components/BaseButton.vue";
 import { driverService } from "@/services/driverService";
+import { formatCurrencyInput, parseCurrencyInput } from "@/utils/money";
 
 const router = useRouter();
 const route = useRoute();
@@ -74,6 +75,12 @@ const handleSubmit = async () => {
 
 const handleCancel = () => {
   router.push("/entregadores");
+};
+
+const handleCurrencyInput = (event, field) => {
+  const hasDigits = /\d/.test(event.target.value);
+  form[field] = parseCurrencyInput(event.target.value);
+  event.target.value = hasDigits ? formatCurrencyInput(form[field]) : "";
 };
 </script>
 
@@ -168,11 +175,12 @@ const handleCancel = () => {
                 >Ajuda de Custo (R$)</label
               >
               <input
-                v-model="form.allowance"
-                type="number"
-                step="0.01"
+                :value="formatCurrencyInput(form.allowance)"
+                @input="handleCurrencyInput($event, 'allowance')"
+                type="text"
+                inputmode="numeric"
                 class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20"
-                placeholder="0.00"
+                placeholder="R$ 0,00"
               />
             </div>
 
@@ -228,11 +236,12 @@ const handleCancel = () => {
                   >Valor da Entrega (R$)</label
                 >
                 <input
-                  v-model="form.fixedDeliveryValue"
-                  type="number"
-                  step="0.01"
+                  :value="formatCurrencyInput(form.fixedDeliveryValue)"
+                  @input="handleCurrencyInput($event, 'fixedDeliveryValue')"
+                  type="text"
+                  inputmode="numeric"
                   class="w-full md:w-1/2 bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20"
-                  placeholder="0.00"
+                  placeholder="R$ 0,00"
                 />
               </div>
             </div>

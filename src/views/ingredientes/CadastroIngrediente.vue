@@ -12,6 +12,7 @@ import {
 } from "lucide-vue-next";
 import BaseButton from "@/components/BaseButton.vue";
 import { ingredientService } from "@/services/ingredientService";
+import { formatCurrencyInput, parseCurrencyInput } from "@/utils/money";
 
 const router = useRouter();
 const route = useRoute();
@@ -65,23 +66,10 @@ const handleSubmit = async () => {
   }
 };
 
-const formatPrice = (value) => {
-  if (value === null || value === undefined || value === "") {
-    return "";
-  }
-
-  return Number(value).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-};
-
 const handlePriceInput = (event) => {
-  const value = event.target.value.replace(/\D/g, "");
-
-  form.costPrice = Number(value) / 100;
-
-  event.target.value = formatPrice(form.costPrice);
+  const hasDigits = /\d/.test(event.target.value);
+  form.costPrice = parseCurrencyInput(event.target.value);
+  event.target.value = hasDigits ? formatCurrencyInput(form.costPrice) : "";
 };
 const handleStockInput = (event, field) => {
   let value = event.target.value;
@@ -369,7 +357,7 @@ const handleUnitChange = () => {
                 :size="18"
               />
               <input
-                :value="formatPrice(form.costPrice)"
+                :value="formatCurrencyInput(form.costPrice)"
                 @input="handlePriceInput"
                 type="text"
                 inputmode="numeric"

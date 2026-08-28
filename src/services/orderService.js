@@ -10,6 +10,8 @@ export const orderService = {
   advanceStatus: async (id) => (await api.patch(`/orders/${id}/advance`)).data,
   moveToColumn: async (id, targetStatus) =>
     (await api.patch(`/orders/${id}/move`, { targetStatus })).data,
+  cancel: async (id) =>
+    (await api.patch(`/orders/${id}/move`, { targetStatus: "CANCELADO" })).data,
   assignDriver: async (id, driverId, driverName) =>
     (await api.patch(`/orders/${id}/assign-driver`, { driverId, driverName }))
       .data,

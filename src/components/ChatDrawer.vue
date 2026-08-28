@@ -45,6 +45,16 @@ const isIfoodConnected = computed(() =>
 );
 const availableChannels = computed(() => {
   const out = [];
+  const orderId = String(props.order?.id || "").replace(/^#/, "");
+  const existingChannels = new Set(
+    conversations.value
+      .filter(
+        (conversation) =>
+          String(conversation.orderId || "").replace(/^#/, "") === orderId,
+      )
+      .map((conversation) => String(conversation.channel || "").toUpperCase()),
+  );
+  const preferred = String(orderContext.value.channel || "").toUpperCase();
   if (isWhatsappConnected.value)
     out.push({
       value: CHANNELS.WHATSAPP,
@@ -53,6 +63,26 @@ const availableChannels = computed(() => {
     });
   if (isIfoodConnected.value)
     out.push({ value: CHANNELS.IFOOD, label: "iFood", icon: Utensils });
+  if (
+    existingChannels.has(CHANNELS.WHATSAPP) &&
+    !out.some((channel) => channel.value === CHANNELS.WHATSAPP)
+  )
+    out.push({
+      value: CHANNELS.WHATSAPP,
+      label: "WhatsApp",
+      icon: MessageSquare,
+    });
+  if (
+    existingChannels.has(CHANNELS.IFOOD) &&
+    !out.some((channel) => channel.value === CHANNELS.IFOOD)
+  )
+    out.push({ value: CHANNELS.IFOOD, label: "iFood", icon: Utensils });
+  if (existingChannels.has(CHANNELS.BRENDI) || preferred === CHANNELS.BRENDI)
+    out.push({
+      value: CHANNELS.BRENDI,
+      label: "Brendi",
+      icon: MessageSquare,
+    });
   return out;
 });
 const currentConversation = computed(() => {
@@ -151,16 +181,16 @@ const formatTime = (value) =>
     leave-from-class="translate-x-0"
     leave-to-class="translate-x-full"
   >
-    <div v-if="show" class="fixed inset-0 z-[80] flex justify-end">
+    <div v-if="show" class="fixed inset-0 z-[80] flex justify-end sm:items-end sm:p-4">
       <button
-        class="absolute inset-0 bg-slate-950/30 backdrop-blur-[1px]"
+        class="absolute inset-0 bg-slate-950/15"
         aria-label="Fechar chat"
         @click="$emit('close')"
       ></button>
       <aside
-        class="relative w-full md:w-[460px] bg-white shadow-2xl flex flex-col h-full"
+        class="relative w-full sm:w-[330px] bg-white shadow-2xl flex flex-col h-full sm:h-[500px] sm:max-h-[calc(100dvh-2rem)] sm:rounded-3xl overflow-hidden border border-slate-200"
       >
-        <header class="p-5 border-b border-slate-200 bg-white">
+        <header class="p-3 border-b border-slate-200 bg-white">
           <div class="flex items-start justify-between gap-3">
             <div>
               <div
@@ -242,7 +272,7 @@ const formatTime = (value) =>
           </div>
           <div
             ref="chatContainer"
-            class="flex-1 p-5 overflow-y-auto space-y-4 bg-slate-50"
+            class="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50"
           >
             <div v-if="loading" class="text-center text-sm text-slate-400 py-8">
               Carregando conversa...

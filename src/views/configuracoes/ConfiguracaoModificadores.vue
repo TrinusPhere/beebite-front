@@ -460,7 +460,7 @@
       <Transition name="modal-fade">
         <div
           v-if="showGroupModal"
-          class="fixed inset-0 z-50 flex items-center justify-center p-4"
+          class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-x-hidden"
         >
           <div
             class="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
@@ -469,10 +469,10 @@
           <Transition name="modal-slide">
             <div
               v-if="showGroupModal"
-              class="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
+              class="relative bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-3xl max-h-[96vh] sm:max-h-[90vh] flex flex-col overflow-hidden min-w-0"
             >
               <div
-                class="p-6 border-b border-slate-100 flex items-center justify-between"
+                class="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between shrink-0"
               >
                 <h3 class="font-black text-slate-800 text-lg">
                   {{ editingGroup?.id ? "Editar Grupo" : "Novo Grupo" }}
@@ -484,10 +484,10 @@
                   <X :size="18" />
                 </button>
               </div>
-              <div class="flex-1 overflow-y-auto p-6 space-y-5">
+              <div class="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-5">
                 <!-- Nome e ícone -->
-                <div class="grid grid-cols-3 gap-3">
-                  <div class="col-span-2">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div class="sm:col-span-2 min-w-0">
                     <label
                       class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider"
                       >Nome do Grupo *</label
@@ -520,7 +520,7 @@
                     class="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider"
                     >Tipo de Seleção *</label
                   >
-                  <div class="flex gap-3">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label
                       v-for="t in [
                         { v: 'RADIO', l: 'Única (Radio)' },
@@ -528,7 +528,7 @@
                       ]"
                       :key="t.v"
                       :class="[
-                        'flex-1 flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all',
+                        'min-w-0 flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all',
                         groupForm.type === t.v
                           ? 'border-orange-500 bg-orange-50'
                           : 'border-slate-100 hover:border-orange-200',
@@ -561,7 +561,7 @@
                 </div>
 
                 <!-- Obrigatório + limites -->
-                <div class="grid grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div class="flex flex-col gap-1.5">
                     <label
                       class="text-xs font-bold text-slate-600 uppercase tracking-wider"
@@ -619,11 +619,11 @@
                       class="text-xs font-bold text-slate-600 uppercase tracking-wider"
                       >Opções do Grupo</label
                     >
-                    <div class="flex items-center gap-3">
-                      <div class="flex gap-2">
+                    <div class="w-full sm:w-auto min-w-0 flex flex-col lg:flex-row lg:items-center gap-2 sm:gap-3">
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0 flex-1">
                         <!-- Importar Tipo Inteiro -->
                         <select
-                          class="text-xs font-medium bg-slate-50 border border-slate-200 text-slate-600 rounded-lg px-2 py-1.5 outline-none hover:border-slate-300 cursor-pointer"
+                          class="w-full min-w-0 text-xs font-medium bg-slate-50 border border-slate-200 text-slate-600 rounded-lg px-2 py-1.5 outline-none hover:border-slate-300 cursor-pointer"
                           @change="(e) => importCategory(e.target.value, e)"
                         >
                           <option value="">📥 Importar por Tipo...</option>
@@ -641,7 +641,7 @@
 
                         <!-- Importar Item Único -->
                         <select
-                          class="text-xs font-medium bg-slate-50 border border-slate-200 text-slate-600 rounded-lg px-2 py-1.5 outline-none hover:border-slate-300 cursor-pointer"
+                          class="w-full min-w-0 text-xs font-medium bg-slate-50 border border-slate-200 text-slate-600 rounded-lg px-2 py-1.5 outline-none hover:border-slate-300 cursor-pointer"
                           @change="(e) => importFromCatalog(e.target.value, e)"
                         >
                           <option value="">📥 Importar 1 Adicional...</option>
@@ -662,7 +662,7 @@
                       </div>
                       <button
                         @click="addOption"
-                        class="text-xs font-bold text-orange-500 hover:text-orange-600 flex items-center gap-1"
+                        class="shrink-0 text-xs font-bold text-orange-500 hover:text-orange-600 flex items-center gap-1"
                       >
                         <Plus :size="12" /> Opção Manual
                       </button>
@@ -672,24 +672,25 @@
                     <div
                       v-for="(opt, i) in groupForm.options"
                       :key="i"
-                      class="flex items-center gap-2"
+                      class="grid grid-cols-[minmax(0,1fr)_7rem_auto] items-center gap-2 min-w-0"
                     >
                       <input
                         v-model="opt.name"
                         type="text"
                         placeholder="Nome da opção"
-                        class="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:border-orange-400 outline-none"
+                        class="w-full min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:border-orange-400 outline-none"
                       />
                       <div
-                        class="flex items-center gap-1 border border-slate-200 rounded-xl px-3 py-2 text-sm w-28"
+                        class="min-w-0 flex items-center gap-1 border border-slate-200 rounded-xl px-2 sm:px-3 py-2 text-sm w-full"
                       >
                         <span class="text-slate-400 text-xs">R$</span>
                         <input
-                          v-model.number="opt.price"
-                          type="number"
+                          :value="formatCurrencyInput(opt.price)"
+                          @input="handleOptionPriceInput($event, opt)"
+                          type="text"
+                          inputmode="numeric"
                           min="0"
-                          step="0.5"
-                          placeholder="0,00"
+                          placeholder="R$ 0,00"
                           class="w-full text-sm outline-none"
                         />
                       </div>
@@ -703,7 +704,7 @@
                   </div>
                 </div>
               </div>
-              <div class="p-6 border-t border-slate-100 flex gap-3">
+              <div class="p-4 sm:p-6 border-t border-slate-100 flex gap-3 shrink-0">
                 <button
                   @click="closeGroupModal"
                   class="flex-1 py-3 rounded-xl border-2 border-slate-200 text-slate-500 font-bold text-sm hover:bg-slate-50"
@@ -789,11 +790,12 @@
                     >Preço (R$) *</label
                   >
                   <input
-                    v-model.number="additionalForm.price"
-                    type="number"
+                    :value="formatCurrencyInput(additionalForm.price)"
+                    @input="handleAdditionalPriceInput"
+                    type="text"
+                    inputmode="numeric"
                     min="0"
-                    step="0.5"
-                    placeholder="0.00"
+                    placeholder="R$ 0,00"
                     class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-orange-400 outline-none"
                   />
                 </div>
@@ -837,6 +839,7 @@ import {
 import { modifierGroupService } from "@/services/modifierGroupService";
 import { additionalService } from "@/services/additionalService";
 import { productService } from "@/services/productService";
+import { formatCurrencyInput, parseCurrencyInput } from "@/utils/money";
 
 const modifierGroupsDB = ref([]);
 const additionalsDB = ref([]);
@@ -949,6 +952,18 @@ const addOption = () => {
 };
 const removeOption = (i) => {
   groupForm.value.options.splice(i, 1);
+};
+
+const handleOptionPriceInput = (event, option) => {
+  const hasDigits = /\d/.test(event.target.value);
+  option.price = parseCurrencyInput(event.target.value);
+  event.target.value = hasDigits ? formatCurrencyInput(option.price) : "";
+};
+
+const handleAdditionalPriceInput = (event) => {
+  const hasDigits = /\d/.test(event.target.value);
+  additionalForm.value.price = parseCurrencyInput(event.target.value);
+  event.target.value = hasDigits ? formatCurrencyInput(additionalForm.value.price) : "";
 };
 
 const importFromCatalog = (addId, event) => {

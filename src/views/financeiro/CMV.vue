@@ -12,6 +12,7 @@ import BaseButton from "@/components/BaseButton.vue";
 import { cmvService } from "@/services/financialService";
 import { productService } from "@/services/productService";
 import categoryService from "@/services/categoryService";
+import { formatCurrencyInput, parseCurrencyInput } from "@/utils/money";
 
 const activeTab = ref("geral"); // 'geral' ou 'por-produto'
 
@@ -50,6 +51,12 @@ const calcularCmvGeral = async () => {
   } finally {
     loadingGeral.value = false;
   }
+};
+
+const handleCurrencyInput = (event, field) => {
+  const hasDigits = /\d/.test(event.target.value);
+  cmvGeralForm[field] = parseCurrencyInput(event.target.value);
+  event.target.value = hasDigits ? formatCurrencyInput(cmvGeralForm[field]) : "";
 };
 
 const mapAlertColor = (level) => {
@@ -211,9 +218,11 @@ const selecionarProduto = async (produto) => {
             >Estoque Inicial (R$)</label
           >
           <input
-            v-model.number="cmvGeralForm.estoqueInicial"
-            type="number"
-            step="0.01"
+            :value="formatCurrencyInput(cmvGeralForm.estoqueInicial)"
+            @input="handleCurrencyInput($event, 'estoqueInicial')"
+            type="text"
+            inputmode="numeric"
+            placeholder="R$ 0,00"
             class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20"
           />
         </div>
@@ -222,9 +231,11 @@ const selecionarProduto = async (produto) => {
             >Compras do Período (R$)</label
           >
           <input
-            v-model.number="cmvGeralForm.comprasPeriodo"
-            type="number"
-            step="0.01"
+            :value="formatCurrencyInput(cmvGeralForm.comprasPeriodo)"
+            @input="handleCurrencyInput($event, 'comprasPeriodo')"
+            type="text"
+            inputmode="numeric"
+            placeholder="R$ 0,00"
             class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20"
           />
         </div>
@@ -233,9 +244,11 @@ const selecionarProduto = async (produto) => {
             >Estoque Final (R$)</label
           >
           <input
-            v-model.number="cmvGeralForm.estoqueFinal"
-            type="number"
-            step="0.01"
+            :value="formatCurrencyInput(cmvGeralForm.estoqueFinal)"
+            @input="handleCurrencyInput($event, 'estoqueFinal')"
+            type="text"
+            inputmode="numeric"
+            placeholder="R$ 0,00"
             class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20"
           />
         </div>

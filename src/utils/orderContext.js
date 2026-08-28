@@ -8,6 +8,7 @@ export const CHANNELS = {
   CARDAPIO_PROPRIO: "CARDAPIO_PROPRIO",
   WHATSAPP: "WHATSAPP",
   IFOOD: "IFOOD",
+  BRENDI: "BRENDI",
   RAPPI: "RAPPI",
   OUTRO: "OUTRO",
 };
@@ -39,6 +40,7 @@ export const CHANNEL_OPTIONS = [
   { value: CHANNELS.CARDAPIO_PROPRIO, label: "Cardápio próprio" },
   { value: CHANNELS.WHATSAPP, label: "WhatsApp" },
   { value: CHANNELS.IFOOD, label: "iFood" },
+  { value: CHANNELS.BRENDI, label: "Brendi" },
   { value: CHANNELS.RAPPI, label: "Rappi" },
   { value: CHANNELS.OUTRO, label: "Outro" },
 ];
