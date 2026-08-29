@@ -1,8 +1,8 @@
-import api from './api';
+import api from "./api";
 
 export default {
   async getCategories() {
-    const res = await api.get('/categories');
+    const res = await api.get("/categories");
     return res.data;
   },
   async getCategory(id) {
@@ -10,7 +10,7 @@ export default {
     return res.data;
   },
   async createCategory(categoryData) {
-    const res = await api.post('/categories', categoryData);
+    const res = await api.post("/categories", categoryData);
     return res.data;
   },
   async updateCategory(id, categoryData) {
@@ -24,5 +24,5 @@ export default {
   async bulkApplyModifiers(id) {
     const res = await api.post(`/categories/${id}/bulk-apply-modifiers`);
     return res.data;
-  }
+  },
 };

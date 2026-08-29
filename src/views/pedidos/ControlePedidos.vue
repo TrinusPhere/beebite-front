@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { useRouter } from "vue-router";
 import {
   MoreVertical,
   Timer,
@@ -12,262 +12,343 @@ import {
   Edit,
   User,
   FileText, // Ícone NF-e
-  MessageSquare, // Ícone WhatsApp
-  Utensils, // Ícone
-} from 'lucide-vue-next'
-import BaseButton from '@/components/BaseButton.vue'
-import { orderService } from '@/services/orderService'
-import { driverService } from '@/services/driverService'
+  MessageSquare,
+  Eye,
+} from "lucide-vue-next";
+import BaseButton from "@/components/BaseButton.vue";
+import ChatDrawer from "@/components/ChatDrawer.vue";
+import GeneralChatDrawer from "@/components/GeneralChatDrawer.vue";
+import OrderDetailsModal from "@/components/OrderDetailsModal.vue";
+import { orderService } from "@/services/orderService";
+import { driverService } from "@/services/driverService";
+import { integrationService } from "@/services/integrationService";
+import { chatService } from "@/services/chatService";
+import { confirmAction, notify } from "@/services/notificationService";
+import {
+  OPERATIONS,
+  normalizeOrderContext,
+  contextLabel,
+  isDeliveryOrder,
+} from "@/utils/orderContext";
 
-// --- Variáveis para o Novo Botão Flutuante de Abas ---
-const isChatWidgetOpen = ref(false)
-const activeChatWidgetTab = ref('whatsapp') // Aba padrão inicial
+const router = useRouter();
 
-const toggleChatWidget = () => {
-  isChatWidgetOpen.value = !isChatWidgetOpen.value
-}
+const activeOperations = ref([OPERATIONS.SALAO, OPERATIONS.DELIVERY]);
+const openMenuId = ref(null);
 
-const router = useRouter()
+const columns = ref([]);
+const showOrderDetails = ref(false);
+const selectedOrderDetails = ref(null);
+const loadingOrderDetails = ref(false);
 
-const activeFilters = ref(['BALCAO', 'DELIVERY'])
-const openMenuId = ref(null)
+const openOrderDetails = async (order) => {
+  openMenuId.value = null;
+  selectedOrderDetails.value = order;
+  showOrderDetails.value = true;
+  loadingOrderDetails.value = true;
+  try {
+    selectedOrderDetails.value = await orderService.getById(order.id);
+  } catch (error) {
+    console.error("Erro ao carregar detalhes do pedido:", error);
+    notify({ type: "error", message: "Não foi possível carregar os detalhes do pedido." });
+    showOrderDetails.value = false;
+  } finally {
+    loadingOrderDetails.value = false;
+  }
+};
 
-const columns = ref([])
+const closeOrderDetails = () => {
+  showOrderDetails.value = false;
+  selectedOrderDetails.value = null;
+};
 
 const fetchKanban = async () => {
   try {
-    const data = await orderService.getKanban()
-    columns.value = data.columns
+    const data = await orderService.getKanban();
+    columns.value = data.columns;
   } catch (error) {
-    console.error('Erro ao buscar kanban:', error)
+    console.error("Erro ao buscar kanban:", error);
   }
-}
+};
 
 onMounted(() => {
-  fetchKanban()
-  loadDrivers()
-})
+  fetchKanban();
+  loadDrivers();
+  loadChatContext();
+});
 
 const formatTime = (isoString) => {
-  if (!isoString) return '--:--'
+  if (!isoString) return "--:--";
   try {
-    const date = new Date(isoString)
-    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-  } catch { return '--:--' }
-}
+    const date = new Date(isoString);
+    return date.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "--:--";
+  }
+};
 
-// --- Lógica do Chat Drawer ---
-const showChatDrawer = ref(false)
-const selectedPlatformForChat = ref(null) // Armazena a plataforma para o chat (whatsapp ou ifood)
+// --- Chat vinculado diretamente ao pedido ---
+const showChatDrawer = ref(false);
+const showGeneralChat = ref(false);
+const selectedOrderForChat = ref(null);
+const integrations = ref({ whatsapp: {}, ifood: {} });
+const conversations = ref([]);
 
-const openChat = (platform) => {
-  selectedPlatformForChat.value = platform
-  showChatDrawer.value = true
-}
-
+const loadChatContext = async () => {
+  try {
+    const [integrationData, conversationData] = await Promise.all([
+      integrationService.getAll(),
+      chatService.list(),
+    ]);
+    integrations.value = integrationData || { whatsapp: {}, ifood: {} };
+    conversations.value = conversationData || [];
+  } catch (error) {
+    console.error("Erro ao carregar contexto de chat:", error);
+  }
+};
+const getDriverName = (order) => order?.driverName || order?.driver || "";
+const unreadMessagesForOrder = (order) => {
+  const oid = String(order?.id ?? "").replace(/^#/, "");
+  return conversations.value
+    .filter((c) => String(c.orderId ?? "").replace(/^#/, "") === oid)
+    .reduce((t, c) => t + Number(c.unread || 0), 0);
+};
+const totalUnreadMessages = computed(() =>
+  conversations.value.reduce(
+    (total, conversation) => total + Number(conversation.unread || 0),
+    0,
+  ),
+);
+const openOrderChat = (order) => {
+  selectedOrderForChat.value = order;
+  showChatDrawer.value = true;
+};
 const closeChat = () => {
-  showChatDrawer.value = false
-  selectedPlatformForChat.value = null
-}
-
-const handleSendMessage = (messageData) => {
-  console.log('Mensagem enviada:', messageData)
-  // Aqui você faria a chamada para o backend para enviar a mensagem
-  // Ex: axios.post('/api/chats/send', messageData)
-  alert(`Mensagem para ${messageData.platform} do pedido ${messageData.pedidoId}: "${messageData.content}" enviada! (Simulado)`)
-}
+  showChatDrawer.value = false;
+  selectedOrderForChat.value = null;
+};
+const handleChatUpdated = async () => {
+  conversations.value = await chatService.list();
+};
 
 const toggleMenu = (id) => {
-  openMenuId.value = openMenuId.value === id ? null : id
-}
+  openMenuId.value = openMenuId.value === id ? null : id;
+};
 
-const deleteOrder = async (id, colIndex) => {
-  if (confirm('Tem certeza que deseja excluir este pedido?')) {
-    try {
-      await orderService.delete(id)
-      columns.value[colIndex].orders = columns.value[colIndex].orders.filter(o => o.id !== id)
-      openMenuId.value = null
-    } catch (error) {
-      console.error('Erro ao deletar pedido:', error)
-      alert('Erro ao excluir pedido.')
-    }
+const canCancelOrder = (order, columnId = "") =>
+  !["EM_ROTA", "FINALIZADO", "CANCELADO"].includes(
+    String(order?.status || columnId).toUpperCase(),
+  );
+
+const cancelOrder = async (order, columnId) => {
+  if (!canCancelOrder(order, columnId)) return;
+
+  const confirmed = await confirmAction({
+    title: "Cancelar pedido?",
+    message: "O pedido será cancelado e permanecerá registrado no histórico.",
+    confirmLabel: "Sim, cancelar",
+  });
+  if (!confirmed) return;
+
+  try {
+    await orderService.cancel(order.id);
+    await fetchKanban();
+    openMenuId.value = null;
+  } catch (error) {
+    console.error("Erro ao cancelar pedido:", error);
+    notify({
+      type: "error",
+      message: error.response?.data?.message || "Erro ao cancelar pedido.",
+    });
   }
-}
+};
 
 // Computado para aplicar o filtro nas colunas
 const filteredColumns = computed(() => {
-  if (!columns.value) return []
-  return columns.value.map(col => ({
+  if (!columns.value) return [];
+  return columns.value.map((col) => ({
     ...col,
-    orders: col.orders.filter(order => activeFilters.value.includes(order.type))
-  }))
-})
+    orders: col.orders.filter((order) =>
+      activeOperations.value.includes(normalizeOrderContext(order).operation),
+    ),
+  }));
+});
 
-const toggleFilter = (filter) => {
-  const index = activeFilters.value.indexOf(filter)
+const toggleOperation = (operation) => {
+  const index = activeOperations.value.indexOf(operation);
   if (index > -1) {
-    if (activeFilters.value.length > 1) {
-      activeFilters.value.splice(index, 1)
-    }
+    if (activeOperations.value.length > 1)
+      activeOperations.value.splice(index, 1);
   } else {
-    activeFilters.value.push(filter)
+    activeOperations.value.push(operation);
   }
-}
+};
 
 const selectedOrders = computed(() => {
-  const selected = []
+  const selected = [];
   filteredColumns.value.forEach((col, colIdx) => {
-    col.orders.forEach(order => {
+    col.orders.forEach((order) => {
       if (order.selected) {
-        selected.push({ ...order, colIndex: colIdx })
+        selected.push({ ...order, colIndex: colIdx });
       }
-    })
-  })
-  return selected
-})
+    });
+  });
+  return selected;
+});
 
 // --- Nova funcionalidade: Atribuição de Motoboy ---
-const showMotoboyModal = ref(false)
-const motoboys = ref([])
-const selectedMotoboyId = ref(null)
-const ordersToAssign = ref([]) // Armazena os pedidos que precisam de motoboy atribuído
-const pendingAdvanceOrderId = ref(null) // Order ID pendente de advance após atribuir motoboy
+const showMotoboyModal = ref(false);
+const motoboys = ref([]);
+const selectedMotoboyId = ref(null);
+const ordersToAssign = ref([]); // Armazena os pedidos que precisam de motoboy atribuído
+const pendingAdvanceOrderId = ref(null); // Order ID pendente de advance após atribuir motoboy
 
 const loadDrivers = async () => {
   try {
-    motoboys.value = await driverService.getAll()
+    motoboys.value = await driverService.getAll();
   } catch (e) {
-    console.error('Erro ao carregar entregadores:', e)
+    console.error("Erro ao carregar entregadores:", e);
   }
-}
+};
 
 const openMotoboyModal = (orders) => {
-  ordersToAssign.value = orders
-  selectedMotoboyId.value = null // Resetar seleção
-  showMotoboyModal.value = true
-}
+  ordersToAssign.value = orders;
+  selectedMotoboyId.value = null; // Resetar seleção
+  showMotoboyModal.value = true;
+};
 
 const closeMotoboyModal = () => {
-  showMotoboyModal.value = false
-  ordersToAssign.value = []
-  selectedMotoboyId.value = null
-}
+  showMotoboyModal.value = false;
+  ordersToAssign.value = [];
+  selectedMotoboyId.value = null;
+};
 
 const assignMotoboy = async () => {
   if (!selectedMotoboyId.value) {
-    alert('Por favor, selecione um motoboy.')
-    return
+    alert("Por favor, selecione um motoboy.");
+    return;
   }
-  const motoboy = motoboys.value.find(m => m.id === selectedMotoboyId.value)
+  const motoboy = motoboys.value.find((m) => m.id === selectedMotoboyId.value);
   if (!motoboy) {
-    alert('Motoboy selecionado inválido.')
-    return
+    alert("Motoboy selecionado inválido.");
+    return;
   }
 
   try {
     await orderService.batchAssignDriver(
-      ordersToAssign.value.map(o => o.id),
+      ordersToAssign.value.map((o) => o.id),
       motoboy.id,
-      motoboy.name
-    )
+      motoboy.name,
+    );
 
     // Se há um pedido pendente de advance, avançar agora
     if (pendingAdvanceOrderId.value) {
-      const advanceId = pendingAdvanceOrderId.value
-      pendingAdvanceOrderId.value = null
-      closeMotoboyModal()
-      await orderService.advanceStatus(advanceId)
-      await fetchKanban()
+      const advanceId = pendingAdvanceOrderId.value;
+      pendingAdvanceOrderId.value = null;
+      closeMotoboyModal();
+      await orderService.advanceStatus(advanceId);
+      await fetchKanban();
     } else {
-      await fetchKanban()
-      closeMotoboyModal()
+      await fetchKanban();
+      closeMotoboyModal();
     }
   } catch (error) {
-    console.error('Erro ao atribuir motoboy:', error)
-    alert(error.response?.data?.message || 'Erro ao atribuir motoboy.')
+    console.error("Erro ao atribuir motoboy:", error);
+    alert(error.response?.data?.message || "Erro ao atribuir motoboy.");
   }
-}
+};
 
 // --- Lógica de Drag and Drop e Sincronização iFood ---
-const isDragging = ref(false)
-const draggedOrder = ref(null)
-const draggedFromColumnIndex = ref(null)
+const isDragging = ref(false);
+const draggedOrder = ref(null);
+const draggedFromColumnIndex = ref(null);
 
 const startDrag = (event, order, colIndex) => {
-  isDragging.value = true
-  draggedOrder.value = order
-  draggedFromColumnIndex.value = colIndex
-  event.dataTransfer.effectAllowed = 'move'
-  event.dataTransfer.setData('text/plain', order.id) // Necessário para Firefox
-}
+  isDragging.value = true;
+  draggedOrder.value = order;
+  draggedFromColumnIndex.value = colIndex;
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", order.id); // Necessário para Firefox
+};
 
 const onDrop = (event, toColIndex) => {
-  event.preventDefault()
-  isDragging.value = false
+  event.preventDefault();
+  isDragging.value = false;
 
-  if (!draggedOrder.value || draggedFromColumnIndex.value === null) return
+  if (!draggedOrder.value || draggedFromColumnIndex.value === null) return;
 
-  const fromColIndex = draggedFromColumnIndex.value
-  const order = draggedOrder.value
+  const fromColIndex = draggedFromColumnIndex.value;
+  const order = draggedOrder.value;
 
   // Prevenir mover para a mesma coluna
   if (fromColIndex === toColIndex) {
-    draggedOrder.value = null
-    draggedFromColumnIndex.value = null
-    return
+    draggedOrder.value = null;
+    draggedFromColumnIndex.value = null;
+    return;
   }
 
   // Remover o pedido da coluna de origem
-  const fromColumn = columns[fromColIndex]
-  fromColumn.orders = fromColumn.orders.filter(o => o.id !== order.id)
+  const fromColumn = columns[fromColIndex];
+  fromColumn.orders = fromColumn.orders.filter((o) => o.id !== order.id);
 
   // Adicionar o pedido à nova coluna
-  const toColumn = columns[toColIndex]
-  toColumn.orders.unshift(order) // Adiciona no início da nova coluna
+  const toColumn = columns[toColIndex];
+  toColumn.orders.unshift(order); // Adiciona no início da nova coluna
 
   // Lógica de sincronização iFood
-  if (order.platform === 'ifood' && order.externalOrderId) {
-    updateIfoodStatus(order, fromColumn.id, toColumn.id)
+  if (order.platform === "ifood" && order.externalOrderId) {
+    updateIfoodStatus(order, fromColumn.id, toColumn.id);
   }
 
   // Lógica de avaliação ao finalizar
-  if (toColumn.id === 'finalizado') {
-    const driverName = order.driver || 'Não aplicável (Balcão)'
+  if (toColumn.id === "finalizado") {
+    const driverName = getDriverName(order) || "Não aplicável (Balcão)";
     setTimeout(() => {
-      alert(`Mensagem automática enviada via WhatsApp para o cliente ${order.customerName} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`)
-    }, 500)
+      alert(
+        `Mensagem automática enviada via WhatsApp para o cliente ${order.customerName} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`,
+      );
+    }, 500);
   }
 
-  draggedOrder.value = null
-  draggedFromColumnIndex.value = null
-}
+  draggedOrder.value = null;
+  draggedFromColumnIndex.value = null;
+};
 
 const allowDrop = (event) => {
-  event.preventDefault()
-}
+  event.preventDefault();
+};
 
 const updateIfoodStatus = (order, fromColumnId, toColumnId) => {
-  console.log(`Simulando atualização de status iFood para o pedido ${order.id} (externalId: ${order.externalOrderId})`)
-  console.log(`De: ${fromColumnId} Para: ${toColumnId}`)
+  console.log(
+    `Simulando atualização de status iFood para o pedido ${order.id} (externalId: ${order.externalOrderId})`,
+  );
+  console.log(`De: ${fromColumnId} Para: ${toColumnId}`);
 
   // Mapeamento de colunas para status da iFood API (simplificado)
   const ifoodStatusMap = {
-    'preparando': 'confirm', // ou startPreparation
-    'rota': 'dispatched',
-    'entregue': 'delivered'
-  }
+    preparando: "confirm", // ou startPreparation
+    rota: "dispatched",
+    entregue: "delivered",
+  };
 
-  const targetIfoodStatus = ifoodStatusMap[toColumnId]
+  const targetIfoodStatus = ifoodStatusMap[toColumnId];
 
   if (!targetIfoodStatus) {
-    console.warn(`Transição de status para ${toColId} não mapeada para iFood API.`)
-    return
+    console.warn(
+      `Transição de status para ${toColId} não mapeada para iFood API.`,
+    );
+    return;
   }
 
   // Simula a chamada à API do iFood
   // Em um sistema real, você faria um axios.post para seu backend
   // que por sua vez chamaria a iFood Merchant API.
-  console.log(`Chamando iFood API para ${order.externalOrderId} com status: ${targetIfoodStatus}`)
+  console.log(
+    `Chamando iFood API para ${order.externalOrderId} com status: ${targetIfoodStatus}`,
+  );
 
   // Exemplo de como seria a chamada real (via backend):
   // axios.post(`/api/ifood/orders/${order.externalOrderId}/status`, { newStatus: targetIfoodStatus })
@@ -281,284 +362,339 @@ const updateIfoodStatus = (order, fromColumnId, toColumnId) => {
   //     // Reverter a mudança no frontend se a API falhar
   //   });
 
-  alert(`Simulação: Status iFood do pedido ${order.id} atualizado para "${toColId}"!`)
-}
+  alert(
+    `Simulação: Status iFood do pedido ${order.id} atualizado para "${toColId}"!`,
+  );
+};
 
 // --- Polling de Novos Pedidos iFood ---
-let pollingInterval = null
-const isPolling = ref(false)
+let pollingInterval = null;
+const isPolling = ref(false);
 
 const startPollingIfoodOrders = () => {
-  if (isPolling.value) return
+  if (isPolling.value) return;
 
-  isPolling.value = true
-  console.log('Iniciando polling de pedidos iFood...')
+  isPolling.value = true;
+  console.log("Iniciando polling de pedidos iFood...");
 
   pollingInterval = setInterval(() => {
-    console.log('Verificando novos pedidos iFood (simulado)...')
+    console.log("Verificando novos pedidos iFood (simulado)...");
     // Simula uma chamada ao backend para buscar novos pedidos iFood
     // Em um sistema real, seria um GET /api/ifood/new-orders
     setTimeout(() => {
       // Simula a chegada de um novo pedido iFood a cada 15 segundos
-      if (Math.random() < 0.3) { // 30% de chance de um novo pedido
-        const newIfoodOrderId = `IFD-${Math.floor(Math.random() * 100000)}`
+      if (Math.random() < 0.3) {
+        // 30% de chance de um novo pedido
+        const newIfoodOrderId = `IFD-${Math.floor(Math.random() * 100000)}`;
         const newOrder = {
           id: newIfoodOrderId,
           customer: `Cliente iFood ${Math.floor(Math.random() * 100)}`,
-          items: '1x X-Burger, 1x Refri',
-          time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          items: "1x X-Burger, 1x Refri",
+          time: new Date().toLocaleTimeString("pt-BR", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
           total: `R$ ${(Math.random() * 50 + 20).toFixed(2)}`,
           selected: false,
-          type: 'delivery',
+          type: "delivery",
           driver: null,
-          platform: 'ifood',
-          externalOrderId: `IFD-EXT-${Math.floor(Math.random() * 1000)}`
-        }
+          platform: "ifood",
+          externalOrderId: `IFD-EXT-${Math.floor(Math.random() * 1000)}`,
+        };
 
-        const preparingColumn = columns.find(col => col.id === 'preparando')
+        const preparingColumn = columns.find((col) => col.id === "preparando");
         if (preparingColumn) {
-          preparingColumn.orders.unshift(newOrder)
-          alert(`Novo pedido iFood recebido: ${newOrder.id}!`)
+          preparingColumn.orders.unshift(newOrder);
+          alert(`Novo pedido iFood recebido: ${newOrder.id}!`);
         }
       }
-    }, 1000) // Simula o tempo de resposta do backend
-  }, 15000) // Polling a cada 15 segundos (para demonstração)
-}
+    }, 1000); // Simula o tempo de resposta do backend
+  }, 15000); // Polling a cada 15 segundos (para demonstração)
+};
 
 const stopPollingIfoodOrders = () => {
   if (pollingInterval) {
-    clearInterval(pollingInterval)
-    pollingInterval = null
+    clearInterval(pollingInterval);
+    pollingInterval = null;
   }
-  isPolling.value = false
-  console.log('Polling de pedidos iFood parado.')
-}
+  isPolling.value = false;
+  console.log("Polling de pedidos iFood parado.");
+};
 
 onMounted(() => {
-  startPollingIfoodOrders()
-})
+  startPollingIfoodOrders();
+});
 
 onUnmounted(() => {
-  stopPollingIfoodOrders()
-})
+  stopPollingIfoodOrders();
+});
 
 const moveOrder = (orderId, currentColumnIndex) => {
-  const rotaColumnIndex = columns.findIndex(col => col.id === 'rota')
-  const finalizadoColumnIndex = columns.findIndex(col => col.id === 'finalizado')
+  const rotaColumnIndex = columns.findIndex((col) => col.id === "rota");
+  const finalizadoColumnIndex = columns.findIndex(
+    (col) => col.id === "finalizado",
+  );
 
-  if (currentColumnIndex + 1 === rotaColumnIndex) { // Movendo para 'Em Rota de Entrega'
-    const originalCol = columns[currentColumnIndex]
-    const order = originalCol.orders.find(o => o.id === orderId)
-    if (order && order.type === 'delivery') {
-      openMotoboyModal([{ id: order.id, colIndex: currentColumnIndex }])
-    } else if (order && order.type === 'balcao') {
+  if (currentColumnIndex + 1 === rotaColumnIndex) {
+    // Movendo para 'Em Rota de Entrega'
+    const originalCol = columns[currentColumnIndex];
+    const order = originalCol.orders.find((o) => o.id === orderId);
+    if (order && order.type === "delivery") {
+      openMotoboyModal([{ id: order.id, colIndex: currentColumnIndex }]);
+    } else if (order && order.type === "balcao") {
       // Se for balcão, move diretamente sem motoboy
-      const orderIndex = originalCol.orders.findIndex(o => o.id === orderId)
+      const orderIndex = originalCol.orders.findIndex((o) => o.id === orderId);
       if (orderIndex !== -1) {
-        const [movedOrder] = originalCol.orders.splice(orderIndex, 1)
-        columns[currentColumnIndex + 1].orders.unshift(movedOrder)
+        const [movedOrder] = originalCol.orders.splice(orderIndex, 1);
+        columns[currentColumnIndex + 1].orders.unshift(movedOrder);
       }
     }
   } else if (currentColumnIndex < columns.length - 1) {
-    const originalCol = columns[currentColumnIndex]
-    const orderIndex = originalCol.orders.findIndex(o => o.id === orderId)
+    const originalCol = columns[currentColumnIndex];
+    const orderIndex = originalCol.orders.findIndex((o) => o.id === orderId);
     if (orderIndex !== -1) {
-      const [order] = originalCol.orders.splice(orderIndex, 1)
-      const targetColIndex = currentColumnIndex + 1
-      columns[targetColIndex].orders.unshift(order)
+      const [order] = originalCol.orders.splice(orderIndex, 1);
+      const targetColIndex = currentColumnIndex + 1;
+      columns[targetColIndex].orders.unshift(order);
 
       // Se moveu para finalizado, disparar solicitação de avaliação
       if (targetColIndex === finalizadoColumnIndex) {
-        const driverName = order.driver || 'Não aplicável (Balcão)'
+        const driverName = getDriverName(order) || "Não aplicável (Balcão)";
         // Simulação do envio de mensagem de avaliação
         setTimeout(() => {
-          alert(`Mensagem automática enviada via WhatsApp para o cliente ${order.customerName} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`)
-        }, 500)
+          alert(
+            `Mensagem automática enviada via WhatsApp para o cliente ${order.customerName} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`,
+          );
+        }, 500);
       }
     }
   }
-}
+};
 
 const advanceOrder = async (orderId) => {
   // Buscar o pedido nas colunas do kanban para verificar tipo e coluna atual
-  let orderData = null
-  let columnId = null
+  let orderData = null;
+  let columnId = null;
   for (const col of columns.value) {
-    const found = col.orders.find(o => o.id === orderId)
+    const found = col.orders.find((o) => o.id === orderId);
     if (found) {
-      orderData = found
-      columnId = col.id
-      break
+      orderData = found;
+      columnId = col.id;
+      break;
     }
   }
 
   // Se é DELIVERY e está em PREPARO → abrir modal de motoboy antes
-  if (orderData && orderData.type === 'DELIVERY' && columnId === 'PREPARO' && !orderData.driverName) {
-    pendingAdvanceOrderId.value = orderId
-    openMotoboyModal([{ id: orderId }])
-    return
+  if (
+    orderData &&
+    isDeliveryOrder(orderData) &&
+    columnId === "PREPARO" &&
+    !orderData.driverName
+  ) {
+    pendingAdvanceOrderId.value = orderId;
+    openMotoboyModal([{ id: orderId }]);
+    return;
   }
 
   try {
-    await orderService.advanceStatus(orderId)
-    await fetchKanban()
-    openMenuId.value = null
+    await orderService.advanceStatus(orderId);
+    await fetchKanban();
+    openMenuId.value = null;
   } catch (error) {
-    console.error('Erro ao avançar pedido:', error)
+    console.error("Erro ao avançar pedido:", error);
     if (error.response?.status === 422) {
-       alert(error.response.data.message || 'Erro ao avançar pedido (ação inválida).')
+      alert(
+        error.response.data.message ||
+          "Erro ao avançar pedido (ação inválida).",
+      );
     } else {
-       alert('Erro ao avançar status.')
+      alert("Erro ao avançar status.");
     }
   }
-}
+};
 
 const processBatchMove = async (orders, action) => {
-  if (action === 'avance' || action === 'send_to_kitchen') {
+  if (action === "avance" || action === "send_to_kitchen") {
     try {
-      await orderService.batchMove(orders.map(o => o.id), 'PREPARO')
-      await fetchKanban()
-      orders.forEach(o => o.selected = false)
+      await orderService.batchMove(
+        orders.map((o) => o.id),
+        "PREPARO",
+      );
+      await fetchKanban();
+      orders.forEach((o) => (o.selected = false));
     } catch (error) {
-      console.error('Erro ao mover em lote:', error)
+      console.error("Erro ao mover em lote:", error);
     }
-  } else if (action === 'assign_driver') {
-    openMotoboyModal(orders)
+  } else if (action === "assign_driver") {
+    openMotoboyModal(orders);
   }
-}
+};
 
 const moveSelectedTo = (targetColIndex) => {
-  const rotaColumnIndex = columns.findIndex(col => col.id === 'rota')
-  if (targetColIndex === rotaColumnIndex) { // Movendo para 'Em Rota de Entrega'
-    const deliveryOrdersToMove = selectedOrders.value.filter(order => order.type === 'delivery')
-    const balcaoOrdersToMove = selectedOrders.value.filter(order => order.type === 'balcao')
+  const rotaColumnIndex = columns.findIndex((col) => col.id === "rota");
+  if (targetColIndex === rotaColumnIndex) {
+    // Movendo para 'Em Rota de Entrega'
+    const deliveryOrdersToMove = selectedOrders.value.filter((order) =>
+      isDeliveryOrder(order),
+    );
+    const salaoOrdersToMove = selectedOrders.value.filter(
+      (order) => !isDeliveryOrder(order),
+    );
 
     if (deliveryOrdersToMove.length > 0) {
-      openMotoboyModal(deliveryOrdersToMove)
-    } else if (balcaoOrdersToMove.length > 0) {
-      // Mover pedidos de balcão diretamente
-      balcaoOrdersToMove.forEach(item => {
-        const originalColIdx = columns.findIndex((_, idx) => idx === item.colIndex)
-        const col = columns[originalColIdx]
-        const orderIdx = col.orders.findIndex(o => o.id === item.id)
+      openMotoboyModal(deliveryOrdersToMove);
+    } else if (salaoOrdersToMove.length > 0) {
+      alert(
+        "Pedidos da operação SALÃO não podem ser enviados para a coluna de rota de entrega.",
+      );
+      return;
+      salaoOrdersToMove.forEach((item) => {
+        const originalColIdx = columns.findIndex(
+          (_, idx) => idx === item.colIndex,
+        );
+        const col = columns[originalColIdx];
+        const orderIdx = col.orders.findIndex((o) => o.id === item.id);
         if (orderIdx !== -1) {
-          const [order] = col.orders.splice(orderIdx, 1)
-          order.selected = false
-          columns[targetColIndex].orders.unshift(order)
+          const [order] = col.orders.splice(orderIdx, 1);
+          order.selected = false;
+          columns[targetColIndex].orders.unshift(order);
         }
-      })
+      });
       // Limpar seleção após mover
-      selectedOrders.value.forEach(order => order.selected = false)
+      selectedOrders.value.forEach((order) => (order.selected = false));
     } else {
-      alert('Nenhum pedido selecionado para mover para "Em Rota de Entrega".')
+      alert('Nenhum pedido selecionado para mover para "Em Rota de Entrega".');
     }
   } else {
     // Lógica existente para mover para outras colunas
-    selectedOrders.value.forEach(item => {
-      const originalColIdx = columns.findIndex((_, idx) => idx === item.colIndex)
-      const col = columns[originalColIdx]
-      const orderIdx = col.orders.findIndex(o => o.id === item.id)
+    selectedOrders.value.forEach((item) => {
+      const originalColIdx = columns.findIndex(
+        (_, idx) => idx === item.colIndex,
+      );
+      const col = columns[originalColIdx];
+      const orderIdx = col.orders.findIndex((o) => o.id === item.id);
       if (orderIdx !== -1) {
-        const [order] = col.orders.splice(orderIdx, 1)
-        order.selected = false
-        columns[targetColIndex].orders.unshift(order)
+        const [order] = col.orders.splice(orderIdx, 1);
+        order.selected = false;
+        columns[targetColIndex].orders.unshift(order);
       }
-    }
-    )
+    });
   }
-}
+};
 
 const toggleAllInColumn = (colIndex, value) => {
-  filteredColumns.value[colIndex].orders.forEach(o => o.selected = value)
-}
+  filteredColumns.value[colIndex].orders.forEach((o) => (o.selected = value));
+};
 
 const goToNewOrder = () => {
-  router.push({ name: 'novo-pedido' })
-}
+  router.push({ name: "novo-pedido" });
+};
 
 const printReceipt = (orderId) => {
-  alert(`Imprimindo cupom do pedido #${orderId}`)
-  openMenuId.value = null
-}
+  alert(`Imprimindo cupom do pedido #${orderId}`);
+  openMenuId.value = null;
+};
 
 const emitNfe = async (orderId) => {
   try {
-    await orderService.emitNfe(orderId)
-    alert(`NF-e emitida com sucesso para o pedido #${orderId}!`)
-    await fetchKanban()
+    await orderService.emitNfe(orderId);
+    alert(`NF-e emitida com sucesso para o pedido #${orderId}!`);
+    await fetchKanban();
   } catch (error) {
-    console.error('Erro ao emitir NF-e:', error)
-    alert('Erro ao emitir NF-e')
+    console.error("Erro ao emitir NF-e:", error);
+    alert("Erro ao emitir NF-e");
   }
-  openMenuId.value = null
-}
+  openMenuId.value = null;
+};
 
 const editOrder = (orderId) => {
-  openMenuId.value = null
-  router.push({ name: 'editar-pedido', params: { id: orderId } })
-}
+  openMenuId.value = null;
+  router.push({ name: "editar-pedido", params: { id: orderId } });
+};
 
 const emitirNFe = (order) => {
-  openMenuId.value = null
-  alert(`NF-e do pedido ${order.id} emitida com sucesso! (Simulado)`)
-}
+  openMenuId.value = null;
+  alert(`NF-e do pedido ${order.id} emitida com sucesso! (Simulado)`);
+};
 </script>
 
 <template>
   <div class="space-y-6" @click="openMenuId = null">
     <!-- Header e Filtros -->
     <div class="flex flex-col gap-6">
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div
+        class="flex flex-col md:flex-row md:items-center justify-between gap-4"
+      >
         <div>
-          <h1 class="text-2xl font-black text-slate-800 tracking-tight">Painel de Pedidos</h1>
-          <p class="text-slate-500 text-sm font-medium">Controle de produção e logística</p>
+          <h1 class="text-2xl font-black text-slate-800 tracking-tight">
+            Painel de Pedidos
+          </h1>
+          <p class="text-slate-500 text-sm font-medium">
+            Controle de produção e logística
+          </p>
         </div>
 
         <div class="flex items-center gap-3">
-          <div class="bg-white border border-slate-200 p-1 rounded-2xl flex gap-1 shadow-sm">
-          <button 
-            @click="toggleFilter('BALCAO')"
-            :class="[
-              'px-4 py-2 rounded-xl text-sm font-bold transition-all border flex items-center gap-2',
-              activeFilters.includes('BALCAO')
-                ? 'bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-500/20'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300'
-            ]"
+          <div
+            class="bg-white border border-slate-200 p-1 rounded-2xl flex gap-1 shadow-sm"
           >
-            <Store :size="16" />
-            Balcão
-          </button>
-          
-          <button 
-            @click="toggleFilter('DELIVERY')"
-            :class="[
-              'px-4 py-2 rounded-xl text-sm font-bold transition-all border flex items-center gap-2',
-              activeFilters.includes('DELIVERY')
-                ? 'bg-blue-500 text-white border-blue-500 shadow-sm shadow-blue-500/20'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
-            ]"
-          >
-            <Bike :size="16" />
-            Delivery
-          </button>
+            <button
+              @click="toggleOperation(OPERATIONS.SALAO)"
+              :class="[
+                'px-4 py-2 rounded-xl text-sm font-bold transition-all border flex items-center gap-2',
+                activeOperations.includes(OPERATIONS.SALAO)
+                  ? 'bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-500/20'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300',
+              ]"
+            >
+              <Store :size="16" />
+              Salão
+            </button>
+
+            <button
+              @click="toggleOperation(OPERATIONS.DELIVERY)"
+              :class="[
+                'px-4 py-2 rounded-xl text-sm font-bold transition-all border flex items-center gap-2',
+                activeOperations.includes(OPERATIONS.DELIVERY)
+                  ? 'bg-blue-500 text-white border-blue-500 shadow-sm shadow-blue-500/20'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300',
+              ]"
+            >
+              <Bike :size="16" />
+              Delivery
+            </button>
           </div>
-          <BaseButton variant="primary" size="md" @click="goToNewOrder">Novo Pedido</BaseButton>
+          <BaseButton variant="primary" size="md" @click="goToNewOrder"
+            >Novo Pedido</BaseButton
+          >
         </div>
       </div>
 
       <!-- Barra de Ações em Massa -->
       <transition
-          enter-active-class="transition duration-300 ease-out"
-          enter-from-class="transform -translate-y-4 opacity-0"
-          enter-to-class="transform translate-y-0 opacity-100"
+        enter-active-class="transition duration-300 ease-out"
+        enter-from-class="transform -translate-y-4 opacity-0"
+        enter-to-class="transform translate-y-0 opacity-100"
       >
-        <div v-if="selectedOrders.length > 0" class="bg-slate-900 text-white p-4 rounded-2xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+        <div
+          v-if="selectedOrders.length > 0"
+          class="bg-slate-900 text-white p-4 rounded-2xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-4"
+        >
           <div class="flex items-center gap-3">
-            <div class="bg-orange-500 p-2 rounded-lg"><ArrowRightLeft :size="20" /></div>
-            <span class="font-bold">{{ selectedOrders.length }} pedidos selecionados</span>
+            <div class="bg-orange-500 p-2 rounded-lg">
+              <ArrowRightLeft :size="20" />
+            </div>
+            <span class="font-bold"
+              >{{ selectedOrders.length }} pedidos selecionados</span
+            >
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <button v-for="(col, idx) in columns" :key="col.id" @click="moveSelectedTo(idx)" class="px-3 py-1.5 bg-white/10 hover:bg-white text-white hover:text-slate-900 rounded-lg text-[10px] font-black uppercase transition-all">
+            <button
+              v-for="(col, idx) in columns"
+              :key="col.id"
+              @click="moveSelectedTo(idx)"
+              class="px-3 py-1.5 bg-white/10 hover:bg-white text-white hover:text-slate-900 rounded-lg text-[10px] font-black uppercase transition-all"
+            >
               {{ col.title }}
             </button>
           </div>
@@ -567,65 +703,150 @@ const emitirNFe = (order) => {
     </div>
 
     <!-- Kanban Board -->
-    <div class="flex gap-6 overflow-x-auto pb-6 custom-scrollbar min-h-[calc(100vh-250px)]">
-      <div v-for="(column, colIndex) in filteredColumns" :key="column.id" class="flex-shrink-0 w-84 flex flex-col gap-4">
+    <div
+      class="flex gap-6 overflow-x-auto pb-6 custom-scrollbar min-h-[calc(100vh-250px)]"
+    >
+      <div
+        v-for="(column, colIndex) in filteredColumns"
+        :key="column.id"
+        class="flex-shrink-0 w-84 flex flex-col gap-4"
+      >
         <!-- Header da Coluna -->
         <div class="flex items-center justify-between px-2">
           <div class="flex items-center gap-2">
-            <input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-orange-600" :checked="column.orders.length > 0 && column.orders.every(o => o.selected)" @change="toggleAllInColumn(colIndex, $event.target.checked)">
-            <div :class="['p-2 rounded-lg', column.bg, column.color]"><component :is="column.icon" :size="18" /></div>
-            <h3 :class="['font-black text-[10px] uppercase tracking-widest', column.color]">{{ column.title }}</h3>
+            <input
+              type="checkbox"
+              class="w-4 h-4 rounded border-slate-300 text-orange-600"
+              :checked="
+                column.orders.length > 0 &&
+                column.orders.every((o) => o.selected)
+              "
+              @change="toggleAllInColumn(colIndex, $event.target.checked)"
+            />
+            <div :class="['p-2 rounded-lg', column.bg, column.color]">
+              <component :is="column.icon" :size="18" />
+            </div>
+            <h3
+              :class="[
+                'font-black text-[10px] uppercase tracking-widest',
+                column.color,
+              ]"
+            >
+              {{ column.title }}
+            </h3>
           </div>
-          <span class="bg-white border border-slate-200 text-slate-600 text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">{{ column.orders.length }}</span>
+          <span
+            class="bg-white border border-slate-200 text-slate-600 text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm"
+            >{{ column.orders.length }}</span
+          >
         </div>
 
         <!-- Lista de Pedidos -->
         <div
-            class="flex-1 space-y-4 bg-slate-100/50 p-2 rounded-[2.5rem] border-2 border-dashed border-slate-200"
-            @drop="onDrop($event, colIndex)"
-            @dragover="allowDrop"
-            @dragleave="isDragging = false"
+          class="flex-1 space-y-4 bg-slate-100/50 p-2 rounded-[2.5rem] border-2 border-dashed border-slate-200"
+          @drop="onDrop($event, colIndex)"
+          @dragover="allowDrop"
+          @dragleave="isDragging = false"
         >
           <TransitionGroup name="list">
             <div
-                v-for="order in column.orders"
-                :key="order.id"
-                class="border p-3 rounded-2xl shadow-sm hover:shadow-md transition-all group relative overflow-visible flex flex-col gap-2"
-                :class="[column.bg, order.selected ? 'ring-2 ring-orange-500/5' : 'border-slate-200']"
-                draggable="true"
-                @dragstart="startDrag($event, order, colIndex)"
+              v-for="order in column.orders"
+              :key="order.id"
+              class="border p-3 rounded-2xl shadow-sm hover:shadow-md transition-all group relative overflow-visible flex flex-col gap-2"
+              :class="[
+                column.bg,
+                order.selected
+                  ? 'ring-2 ring-orange-500/5'
+                  : 'border-slate-200',
+              ]"
+              draggable="true"
+              @dragstart="startDrag($event, order, colIndex)"
             >
               <!-- Top Row: Checkbox, ID, Time, Menu -->
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                  <input v-model="order.selected" type="checkbox" class="w-4 h-4 rounded border-slate-300 text-orange-600 transition-all cursor-pointer">
-                  <span :class="['text-xs font-black tracking-tight', column.color]">{{ order.displayId || order.id }}</span>
+                  <input
+                    v-model="order.selected"
+                    type="checkbox"
+                    class="w-4 h-4 rounded border-slate-300 text-orange-600 transition-all cursor-pointer"
+                  />
+                  <span
+                    :class="['text-xs font-black tracking-tight', column.color]"
+                    >{{ order.displayId || order.id }}</span
+                  >
                 </div>
 
                 <div class="flex items-center gap-2">
-                  <div class="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">
+                  <div
+                    class="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg"
+                  >
                     <Timer :size="10" /> {{ formatTime(order.createdAt) }}
                   </div>
 
                   <div class="relative">
-                    <button @click.stop="toggleMenu(order.id)" class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all">
+                    <button
+                      @click.stop="toggleMenu(order.id)"
+                      class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
+                    >
                       <MoreVertical :size="14" />
                     </button>
                     <!-- Dropdown Menu -->
-                    <transition enter-active-class="transition duration-100 ease-out" enter-from-class="transform scale-95 opacity-0" enter-to-class="transform scale-100 opacity-100" leave-active-class="transition duration-75 ease-in" leave-from-class="transform scale-100 opacity-100" leave-to-class="transform scale-95 opacity-0">
-                      <div v-if="openMenuId === order.id" class="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1">
-                        <button v-if="['ANALISE', 'PREPARO'].includes(order.status)" @click.stop="editOrder(order.id)" class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                    <transition
+                      enter-active-class="transition duration-100 ease-out"
+                      enter-from-class="transform scale-95 opacity-0"
+                      enter-to-class="transform scale-100 opacity-100"
+                      leave-active-class="transition duration-75 ease-in"
+                      leave-from-class="transform scale-100 opacity-100"
+                      leave-to-class="transform scale-95 opacity-0"
+                    >
+                      <div
+                        v-if="openMenuId === order.id"
+                        class="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1"
+                      >
+                        <button
+                          @click.stop="openOrderDetails(order)"
+                          class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                        >
+                          <Eye :size="14" class="text-orange-500" /> Detalhes do pedido
+                        </button>
+                        <button
+                          v-if="['ANALISE', 'PREPARO'].includes(order.status)"
+                          @click.stop="editOrder(order.id)"
+                          class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                        >
                           <Edit :size="14" class="text-blue-500" /> Editar
                         </button>
-                        <button @click.stop="emitirNFe(order)" class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
-                          <FileText :size="14" class="text-emerald-500" /> Emitir NF-e
+                        <button
+                          @click.stop="emitirNFe(order)"
+                          class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                        >
+                          <FileText :size="14" class="text-emerald-500" />
+                          Emitir NF-e
                         </button>
-                        <button v-if="colIndex < filteredColumns.length - 1" @click="advanceOrder(order.id)" class="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2">
+                        <button
+                          v-if="colIndex < filteredColumns.length - 1"
+                          @click="advanceOrder(order.id)"
+                          class="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2"
+                        >
                           <ChevronRight :size="16" />
                           Avançar Status
                         </button>
-                        <button @click="deleteOrder(order.id, colIndex)" class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">
-                          <Trash2 :size="14" /> Excluir
+                        <button
+                          @click="cancelOrder(order, column.id)"
+                          :disabled="!canCancelOrder(order, column.id)"
+                          :title="
+                            canCancelOrder(order, column.id)
+                              ? 'Cancelar pedido'
+                              : 'Pedidos em rota ou finalizados não podem ser cancelados'
+                          "
+                          :class="[
+                            'w-full flex items-center gap-2 px-3 py-2 text-xs font-bold transition-colors',
+                            canCancelOrder(order, column.id)
+                              ? 'text-red-600 hover:bg-red-50'
+                              : 'text-slate-300 cursor-not-allowed bg-slate-50',
+                          ]"
+                        >
+                          <Trash2 :size="14" /> Cancelar pedido
                         </button>
                       </div>
                     </transition>
@@ -635,25 +856,86 @@ const emitirNFe = (order) => {
 
               <!-- Customer & Driver -->
               <div>
-                <h4 class="font-bold text-slate-800 text-xs truncate">{{ order.customerName || 'Cliente Avulso' }}</h4>
-                <div v-if="order.type === 'BALCAO'" class="px-2 py-1 bg-orange-100 text-orange-600 rounded-md text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
-                  <Store :size="10" /> Balcão
-                </div>
-                <div v-else-if="order.type === 'DELIVERY'" class="px-2 py-1 bg-blue-100 text-blue-600 rounded-md text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
-                  <Bike :size="10" /> Delivery
+                <h4 class="font-bold text-slate-800 text-xs truncate">
+                  {{ order.customerName || "Cliente Avulso" }}
+                </h4>
+                <div class="flex flex-wrap gap-1 mt-1">
+                  <div
+                    v-if="
+                      normalizeOrderContext(order).operation ===
+                      OPERATIONS.SALAO
+                    "
+                    class="px-2 py-1 bg-orange-100 text-orange-600 rounded-md text-[10px] font-black uppercase tracking-widest flex items-center gap-1"
+                  >
+                    <Store :size="10" /> Salão
+                  </div>
+                  <div
+                    v-else
+                    class="px-2 py-1 bg-blue-100 text-blue-600 rounded-md text-[10px] font-black uppercase tracking-widest flex items-center gap-1"
+                  >
+                    <Bike :size="10" /> Delivery
+                  </div>
+                  <div
+                    v-if="
+                      normalizeOrderContext(order).operation ===
+                        OPERATIONS.DELIVERY && getDriverName(order)
+                    "
+                    class="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-black uppercase tracking-wide flex items-center gap-1"
+                    :title="`Entregador: ${getDriverName(order)}`"
+                  >
+                    <Bike :size="10" /> {{ getDriverName(order) }}
+                  </div>
+                  <span
+                    class="px-2 py-1 bg-slate-100 text-slate-500 rounded-md text-[9px] font-black uppercase"
+                    >{{
+                      contextLabel(normalizeOrderContext(order).channel)
+                    }}</span
+                  >
+                  <span
+                    class="px-2 py-1 bg-slate-100 text-slate-500 rounded-md text-[9px] font-black uppercase"
+                    >{{
+                      contextLabel(normalizeOrderContext(order).serviceType)
+                    }}</span
+                  >
                 </div>
               </div>
 
               <!-- Items (Compact) -->
-              <p class="text-[10px] text-slate-500 font-medium leading-tight line-clamp-2">{{ order.itemsSummary }}</p>
+              <p
+                class="text-[10px] text-slate-500 font-medium leading-tight line-clamp-2"
+              >
+                {{ order.itemsSummary }}
+              </p>
 
               <!-- Footer: Total & Action -->
-              <div class="flex items-center justify-between mt-1 pt-2 border-t border-slate-50">
-                <span class="text-xs font-black text-orange-600">R$ {{ (order.totalValue || 0).toFixed(2) }}</span>
+              <div
+                class="flex items-center justify-between mt-1 pt-2 border-t border-slate-50"
+              >
+                <span class="text-xs font-black text-orange-600"
+                  >R$ {{ (order.totalValue || 0).toFixed(2) }}</span
+                >
 
-                <button v-if="colIndex < filteredColumns.length - 1" @click="advanceOrder(order.id)" class="px-2 py-1 bg-slate-50 hover:bg-orange-50 text-slate-500 hover:text-orange-600 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 border border-slate-200 hover:border-orange-200">
-                  Avançar <ChevronRight :size="12" />
-                </button>
+                <div class="flex items-center gap-1.5">
+                  <button
+                    @click.stop="openOrderChat(order)"
+                    class="relative px-2 py-1 bg-white hover:bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black transition-all flex items-center gap-1 border border-blue-200 hover:border-blue-300"
+                    title="Abrir chats deste pedido"
+                  >
+                    <MessageSquare :size="12" /> Chat
+                    <span
+                      v-if="unreadMessagesForOrder(order) > 0"
+                      class="absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center shadow-sm"
+                      >{{ unreadMessagesForOrder(order) }}</span
+                    >
+                  </button>
+                  <button
+                    v-if="colIndex < filteredColumns.length - 1"
+                    @click="advanceOrder(order.id)"
+                    class="px-2 py-1 bg-slate-50 hover:bg-orange-50 text-slate-500 hover:text-orange-600 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 border border-slate-200 hover:border-orange-200"
+                  >
+                    Avançar <ChevronRight :size="12" />
+                  </button>
+                </div>
               </div>
             </div>
           </TransitionGroup>
@@ -662,261 +944,107 @@ const emitirNFe = (order) => {
     </div>
 
     <!-- Motoboy Assignment Modal -->
-    <div v-if="showMotoboyModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div
+      v-if="showMotoboyModal"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+    >
       <div class="bg-white p-6 rounded-3xl shadow-xl w-full max-w-md">
         <h3 class="text-xl font-bold text-slate-800 mb-4">Atribuir Motoboy</h3>
-        <p class="mb-4 text-slate-600">Selecione o motoboy para {{ ordersToAssign.length > 1 ? 'os pedidos selecionados' : 'o pedido' }}:</p>
+        <p class="mb-4 text-slate-600">
+          Selecione o motoboy para
+          {{
+            ordersToAssign.length > 1 ? "os pedidos selecionados" : "o pedido"
+          }}:
+        </p>
 
         <div class="space-y-3 mb-6">
-          <label v-for="motoboy in motoboys" :key="motoboy.id" class="flex items-center p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
-            <input type="radio" :value="motoboy.id" v-model="selectedMotoboyId" class="form-radio text-orange-600">
-            <span class="ml-3 text-slate-700 font-medium">{{ motoboy.name }}</span>
+          <label
+            v-for="motoboy in motoboys"
+            :key="motoboy.id"
+            class="flex items-center p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors"
+          >
+            <input
+              type="radio"
+              :value="motoboy.id"
+              v-model="selectedMotoboyId"
+              class="form-radio text-orange-600"
+            />
+            <span class="ml-3 text-slate-700 font-medium">{{
+              motoboy.name
+            }}</span>
           </label>
         </div>
 
         <div class="flex justify-end gap-3">
-          <BaseButton variant="secondary" @click="closeMotoboyModal">Cancelar</BaseButton>
-          <BaseButton variant="primary" @click="assignMotoboy">Confirmar</BaseButton>
+          <BaseButton variant="secondary" @click="closeMotoboyModal"
+            >Cancelar</BaseButton
+          >
+          <BaseButton variant="primary" @click="assignMotoboy"
+            >Confirmar</BaseButton
+          >
         </div>
       </div>
     </div>
 
-    <!-- Chat Drawer -->
-    <!-- Removido daqui, será global no MainLayout -->
-    <!-- <ChatDrawer
+    <!-- Chat integrado ao pedido -->
+    <ChatDrawer
       :show="showChatDrawer"
-      :pedido="selectedPedidoForChat"
+      :order="selectedOrderForChat"
+      :integrations="integrations"
       @close="closeChat"
-      @send-message="handleSendMessage"
-    /> -->
-  </div>
-  <div class="chat-widget-container">
+      @updated="handleChatUpdated"
+    />
 
-    <!-- Card Flutuante de Abas (Só renderiza se estiver aberto) -->
-    <div v-if="isChatWidgetOpen" class="chat-card">
-      <!-- Cabeçalho -->
-      <div class="chat-card-header">
-        <h3>Canais de Atendimento</h3>
-        <button @click="toggleChatWidget" class="close-btn">&times;</button>
-      </div>
-
-      <!-- Navegação por Abas -->
-      <div class="chat-tabs">
-        <button
-            :class="['tab-btn', { active: activeChatWidgetTab === 'whatsapp' }]"
-            @click="activeChatWidgetTab = 'whatsapp'"
-        >
-          <MessageSquare :size="16" class="inline-icon text-green-500" />
-          WhatsApp
-        </button>
-        <button
-            :class="['tab-btn', { active: activeChatWidgetTab === 'ifood' }]"
-            @click="activeChatWidgetTab = 'ifood'"
-        >
-          <Utensils :size="16" class="inline-icon text-red-500" />
-          iFood
-        </button>
-      </div>
-
-      <!-- Conteúdo Interno das Abas -->
-      <div class="chat-card-content">
-        <!-- Aba WhatsApp -->
-        <div v-if="activeChatWidgetTab === 'whatsapp'" class="tab-content">
-          <p>Deseja iniciar um atendimento direto ou dar suporte ao cliente?</p>
-          <!-- Aqui integra com a sua lógica existente openChat('whatsapp') se necessário, ou link direto -->
-          <button @click="openChat('whatsapp'); toggleChatWidget()" class="action-btn wa-btn">
-            Abrir Chat WhatsApp
-          </button>
-        </div>
-
-        <!-- Aba iFood -->
-        <div v-if="activeChatWidgetTab === 'ifood'" class="tab-content">
-          <p>Gerencie o canal do iFood ou envie mensagens integradas da plataforma.</p>
-          <!-- Integra com a sua lógica existente openChat('ifood') -->
-          <button @click="openChat('ifood'); toggleChatWidget()" class="action-btn ifood-btn">
-            Abrir Chat iFood
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Botão Flutuante Fixo (Gatilho) -->
-    <button @click="toggleChatWidget" class="chat-float-trigger" :class="{ 'btn-active': isChatWidgetOpen }">
-      <!-- Exibe o ícone de mensagem padrão ou troca se estiver aberto -->
-      <MessageSquare v-if="!isChatWidgetOpen" :size="28" color="#FFFFFF" />
-      <span v-else class="text-xl font-bold text-white">&times;</span>
+    <button
+      @click="showGeneralChat = true"
+      class="fixed right-5 bottom-5 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-xl shadow-orange-500/30 hover:scale-105 transition-transform flex items-center justify-center"
+      title="Abrir central de conversas"
+      aria-label="Abrir central de conversas"
+    >
+      <MessageSquare :size="24" />
+      <span
+        v-if="totalUnreadMessages > 0"
+        class="absolute -top-1 -right-1 min-w-6 h-6 px-1 rounded-full bg-red-500 border-2 border-white text-white text-[10px] font-black flex items-center justify-center"
+      >{{ totalUnreadMessages }}</span>
     </button>
 
+    <GeneralChatDrawer
+      :show="showGeneralChat"
+      @close="showGeneralChat = false"
+      @updated="handleChatUpdated"
+    />
+
+    <OrderDetailsModal
+      :show="showOrderDetails"
+      :order="selectedOrderDetails"
+      :loading="loadingOrderDetails"
+      @close="closeOrderDetails"
+    />
   </div>
 </template>
 
 <style scoped>
-/* Container fixado no canto inferior direito */
-.chat-widget-container {
-  position: fixed;
-  bottom: 25px;
-  right: 25px;
-  z-index: 9999;
-  font-family: sans-serif;
+.list-move,
+.list-enter-active,
+.list-leave-active {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-/* Botão Redondo Flutuante */
-.chat-float-trigger {
-  width: 60px;
-  height: 60px;
-  background-color: #3b82f6; /* Azul primário (ajuste conforme seu sistema) */
-  border: none;
-  border-radius: 50%;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.2s ease, background-color 0.2s;
-  float: right;
+.list-enter-from,
+.list-leave-to {
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
 }
-
-.chat-float-trigger:hover {
-  transform: scale(1.05);
-}
-
-/* Estado ativo do botão flutuante (opcional: muda para vermelho ao abrir) */
-.chat-float-trigger.btn-active {
-  background-color: #ef4444;
-}
-
-/* Card flutuante de seleção */
-.chat-card {
-  width: 300px;
-  background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  margin-bottom: 12px;
-  overflow: hidden;
-  border: 1px solid #e5e7eb;
-}
-
-/* Cabeçalho do Card */
-.chat-card-header {
-  background-color: #1f2937;
-  color: #ffffff;
-  padding: 12px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.chat-card-header h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  color: #9ca3af;
-  font-size: 20px;
-  cursor: pointer;
-}
-.close-btn:hover {
-  color: #ffffff;
-}
-
-/* Abas */
-.chat-tabs {
-  display: flex;
-  background: #f3f4f6;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.tab-btn {
-  flex: 1;
-  padding: 10px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  color: #4b5563;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: all 0.2s;
-}
-
-.tab-btn.active {
-  color: #1f2937;
-  background: #ffffff;
-  border-bottom: 3px solid #3b82f6;
-}
-
-/* Conteúdo */
-.chat-card-content {
-  padding: 16px;
-}
-
-.tab-content p {
-  margin: 0 0 12px 0;
-  font-size: 13px;
-  color: #6b7280;
-  line-height: 1.4;
-}
-
-/* Botões de Ação de cada Aba */
-.action-btn {
+.list-leave-active {
+  position: absolute;
   width: 100%;
-  padding: 10px;
-  border: none;
-  border-radius: 6px;
-  color: #ffffff;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  transition: opacity 0.2s;
 }
-
-.action-btn:hover {
-  opacity: 0.9;
+.custom-scrollbar::-webkit-scrollbar {
+  height: 8px;
 }
-
-.wa-btn {
-  background-color: #25D366; /* Verde WhatsApp */
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-slate-100 rounded-full;
 }
-
-.ifood-btn {
-  background-color: #ea1d2c; /* Vermelho iFood */
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 rounded-full hover:bg-slate-400;
 }
-.whatsapp-float {
-  position: fixed;
-  bottom: 20px; /* Distância do fundo da página */
-  right: 20px;  /* Distância da borda direita */
-  z-index: 9999; /* Garante que fica por cima de tudo */
-
-  /* Visual do botão */
-  width: 60px;
-  height: 60px;
-  background-color: #25D366; /* Fundo verde original do WhatsApp */
-  border-radius: 50%;
-  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.3);
-
-  /* Centralização do ícone */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  /* Efeito de clique e transição */
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
-.whatsapp-float:hover {
-  transform: scale(1.1);
-}
-.list-move, .list-enter-active, .list-leave-active { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
-.list-enter-from, .list-leave-to { opacity: 0; transform: translateY(20px) scale(0.95); }
-.list-leave-active { position: absolute; width: 100%; }
-.custom-scrollbar::-webkit-scrollbar { height: 8px; }
-.custom-scrollbar::-webkit-scrollbar-track { @apply bg-slate-100 rounded-full; }
-.custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-slate-300 rounded-full hover:bg-slate-400; }
 </style>
