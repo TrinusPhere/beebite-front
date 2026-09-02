@@ -18,6 +18,10 @@ export default defineConfig({
   server: {
     port: 9090,
     proxy: {
+      '/api/v1/ifood/sync': {
+        target: 'http://localhost:8081',
+        changeOrigin: true
+      },
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true

@@ -9,4 +9,14 @@ export const integrationService = {
     (await api.post("/integrations/ifood/authorize")).data,
   toggleIfoodStore: async (open) =>
     (await api.patch("/integrations/ifood/store-status", { open })).data,
+  
+  // Catalog Sync (requests routed to biteflow-ifood-service via proxy)
+  getIfoodCatalogDiff: async (storeId) =>
+    (await api.get(`/ifood/sync/compare/${storeId}`)).data,
+  mergeIfoodCatalog: async (storeId, decisions) =>
+    (await api.post(`/ifood/sync/merge/${storeId}`, { decisions })).data,
+  importCatalogFromIfood: async (storeId) =>
+    (await api.post(`/ifood/sync/import/${storeId}`)).data,
+  exportCatalogToIfood: async (storeId) =>
+    (await api.post(`/ifood/sync/export/${storeId}`)).data,
 };

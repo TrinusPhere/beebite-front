@@ -20,6 +20,7 @@ import UsuariosView from "../views/usuarios/Usuarios.vue";
 import CadastroUsuario from "@/views/usuarios/CadastroUsuario.vue";
 import CardapioDigital from "../views/cardapio/CardapioDigital.vue";
 import Integracoes from "../views/integracoes/Integracoes.vue";
+import IfoodCatalogSync from "../views/integracoes/IfoodCatalogSync.vue";
 import CMV from "../views/financeiro/CMV.vue";
 import ConfiguracaoModificadores from "../views/configuracoes/ConfiguracaoModificadores.vue";
 import Checklist from "../views/operacional/Checklist.vue";
@@ -196,6 +197,12 @@ const router = createRouter({
           path: "integracoes",
           name: "integracoes",
           component: Integracoes,
+          meta: { requiresPermission: "integracoes" },
+        },
+        {
+          path: "integracoes/ifood-sync",
+          name: "ifood-sync",
+          component: IfoodCatalogSync,
           meta: { requiresPermission: "integracoes" },
         },
         {

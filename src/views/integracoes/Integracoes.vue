@@ -161,6 +161,11 @@ const toggleStore = async () => {
             {{ integrations.ifood.storeStatus === "open" ? "Fechar" : "Abrir" }}
           </button>
         </div>
+        <div v-if="integrations.ifood?.status === 'connected'" class="mt-4">
+          <router-link to="/integracoes/ifood-sync" class="block w-full text-center px-4 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700">
+            Sincronizar Cardápio (iFood ↔ PDV)
+          </router-link>
+        </div>
       </section>
     </div>
     <div class="bg-white border rounded-3xl p-6">
