@@ -31,12 +31,20 @@ const saveWhatsapp = async () => {
   await load();
   saving.value = false;
 };
+import { authState } from "@/utils/auth";
 const saveIfood = async () => {
   saving.value = true;
-  await integrationService.saveIfood(ifood.value);
-  await integrationService.authorizeIfood();
-  await load();
-  saving.value = false;
+  try {
+    const storeId = authState.currentUser?.storeId || "00000000-0000-0000-0000-000000000001";
+    await integrationService.saveIfood(ifood.value);
+    await integrationService.authorizeIfood(storeId, ifood.value);
+    await load();
+  } catch(e) {
+    console.error(e);
+    alert("Erro ao autorizar no iFood. Verifique suas credenciais.");
+  } finally {
+    saving.value = false;
+  }
 };
 const toggleStore = async () => {
   await integrationService.toggleIfoodStore(
@@ -112,7 +120,7 @@ const toggleStore = async () => {
           <span
             :class="[
               'text-xs font-black px-3 py-1 rounded-full',
-              integrations.ifood?.status === 'connected'
+              integrations.ifood?.status === 'configured'
                 ? 'bg-emerald-100 text-emerald-700'
                 : 'bg-slate-100 text-slate-500',
             ]"
@@ -143,7 +151,7 @@ const toggleStore = async () => {
           ><ExternalLink :size="18" /> Salvar e autorizar</BaseButton
         >
         <div
-          v-if="integrations.ifood?.status === 'connected'"
+          v-if="integrations.ifood?.status === 'configured'"
           class="flex items-center justify-between p-4 border rounded-2xl"
         >
           <div>
@@ -161,7 +169,7 @@ const toggleStore = async () => {
             {{ integrations.ifood.storeStatus === "open" ? "Fechar" : "Abrir" }}
           </button>
         </div>
-        <div v-if="integrations.ifood?.status === 'connected'" class="mt-4">
+        <div v-if="integrations.ifood?.status === 'configured'" class="mt-4">
           <router-link to="/integracoes/ifood-sync" class="block w-full text-center px-4 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700">
             Sincronizar Cardápio (iFood ↔ PDV)
           </router-link>

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { RefreshCw, CheckCircle2, AlertCircle, Save, Download, Upload } from 'lucide-vue-next';
 import BaseButton from '@/components/BaseButton.vue';
@@ -9,7 +9,7 @@ import { authState } from '@/utils/auth';
 const route = useRoute();
 const loading = ref(false);
 const diffData = ref(null);
-const storeId = authState.currentUser?.storeId;
+const storeId = authState.currentUser?.storeId || "00000000-0000-0000-0000-000000000001";
 
 const decisions = ref({}); // ifoodItemId or biteflowProductId -> decision object
 
@@ -24,6 +24,8 @@ const loadDiff = async () => {
       diffData.value.entries.forEach(entry => {
         let action = 'IGNORE';
         if (entry.diffStatus === 'MATCH') action = 'LINK_ONLY';
+        else if (entry.diffStatus === 'IFOOD_ONLY') action = 'IMPORT';
+        else if (entry.diffStatus === 'BITEFLOW_ONLY') action = 'EXPORT';
         
         const key = entry.ifoodItem ? entry.ifoodItem.id : entry.biteflowItem.id;
         decisions.value[key] = {
@@ -39,6 +41,31 @@ const loadDiff = async () => {
     loading.value = false;
   }
 };
+
+const hasDifferences = computed(() => {
+  if (!diffData.value) return false;
+  return diffData.value.totalConflicts > 0 || 
+         diffData.value.totalBiteflowOnly > 0 || 
+         diffData.value.totalIfoodOnly > 0;
+});
+
+const isPureBiteflowOnly = computed(() => {
+  if (!diffData.value) return false;
+  return diffData.value.totalBiteflowOnly > 0 && 
+         diffData.value.totalIfoodOnly === 0 && 
+         diffData.value.totalConflicts === 0;
+});
+
+const isPureIfoodOnly = computed(() => {
+  if (!diffData.value) return false;
+  return diffData.value.totalIfoodOnly > 0 && 
+         diffData.value.totalBiteflowOnly === 0 && 
+         diffData.value.totalConflicts === 0;
+});
+
+const isMixed = computed(() => {
+  return hasDifferences.value && !isPureBiteflowOnly.value && !isPureIfoodOnly.value;
+});
 
 onMounted(loadDiff);
 
@@ -85,6 +112,12 @@ const fullExport = async () => {
 const formatPrice = (price) => {
   return price ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price) : 'R$ 0,00';
 };
+
+const formatStatus = (status) => {
+  if (status === 'AVAILABLE') return 'Ativo';
+  if (status === 'UNAVAILABLE') return 'Pausado';
+  return status;
+};
 </script>
 
 <template>
@@ -95,10 +128,10 @@ const formatPrice = (price) => {
         <p class="text-sm text-slate-500">Resolva conflitos e gerencie a sincronização de itens entre o PDV e o iFood.</p>
       </div>
       <div class="flex gap-2">
-        <BaseButton @click="fullImport" :loading="loading" class="bg-blue-600 hover:bg-blue-700">
+        <BaseButton v-if="isPureIfoodOnly" @click="fullImport" :loading="loading" class="bg-blue-600 hover:bg-blue-700">
           <Download :size="18" /> Importar Tudo
         </BaseButton>
-        <BaseButton @click="fullExport" :loading="loading" class="bg-purple-600 hover:bg-purple-700">
+        <BaseButton v-if="isPureBiteflowOnly" @click="fullExport" :loading="loading" class="bg-purple-600 hover:bg-purple-700">
           <Upload :size="18" /> Publicar Tudo
         </BaseButton>
         <BaseButton @click="loadDiff" :loading="loading" class="bg-slate-200 text-slate-800 hover:bg-slate-300">
@@ -112,6 +145,16 @@ const formatPrice = (price) => {
     </div>
 
     <template v-else-if="diffData">
+      <div v-if="!hasDifferences" class="bg-emerald-50 border border-emerald-200 rounded-3xl p-8 text-center mb-6">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100 mb-4">
+          <CheckCircle2 class="text-emerald-600" :size="32" />
+        </div>
+        <h2 class="text-xl font-black text-slate-800 mb-2">Tudo Sincronizado!</h2>
+        <p class="text-slate-500 max-w-md mx-auto">
+          Não há conflitos ou itens pendentes entre o seu PDV e o iFood. Abaixo estão listados os itens que já estão mapeados corretamente.
+        </p>
+      </div>
+
       <div class="grid grid-cols-4 gap-4">
         <div class="bg-white border rounded-2xl p-4 text-center shadow-sm">
           <div class="text-3xl font-black text-emerald-600">{{ diffData.totalMatches }}</div>
@@ -171,7 +214,7 @@ const formatPrice = (price) => {
                       Preço (iFood): {{ formatPrice(entry.biteflowItem.channelPrices?.find(c => c.channel === 'IFOOD')?.price || entry.biteflowItem.price) }}
                     </div>
                     <div class="text-xs text-slate-500" :class="{'text-amber-600 font-bold': entry.conflictFields?.includes('status')}">
-                      Status: {{ entry.biteflowItem.status }}
+                      Status: <span :class="entry.biteflowItem.status === 'AVAILABLE' ? 'text-emerald-600 font-bold' : 'text-red-500 font-bold'">{{ formatStatus(entry.biteflowItem.status) }}</span>
                     </div>
                   </div>
                   <div v-else class="text-slate-400 italic">Não existe no PDV</div>
@@ -187,7 +230,7 @@ const formatPrice = (price) => {
                       Preço: {{ formatPrice(entry.ifoodItem.price?.value) }}
                     </div>
                     <div class="text-xs text-slate-500" :class="{'text-amber-600 font-bold': entry.conflictFields?.includes('status')}">
-                      Status: {{ entry.ifoodItem.status }}
+                      Status: <span :class="entry.ifoodItem.status === 'AVAILABLE' ? 'text-emerald-600 font-bold' : 'text-red-500 font-bold'">{{ formatStatus(entry.ifoodItem.status) }}</span>
                     </div>
                   </div>
                   <div v-else class="text-slate-400 italic">Não publicado no iFood</div>
@@ -213,12 +256,13 @@ const formatPrice = (price) => {
           </table>
         </div>
         
-        <div class="p-6 bg-slate-50 border-t flex justify-end">
+        <div v-if="hasDifferences" class="p-6 bg-slate-50 border-t flex justify-end">
           <BaseButton @click="applyMerge" :loading="loading" class="bg-emerald-600 hover:bg-emerald-700">
             <Save :size="18" /> Aplicar Resoluções
           </BaseButton>
         </div>
       </div>
     </template>
+
   </div>
 </template>

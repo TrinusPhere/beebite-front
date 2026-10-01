@@ -10,6 +10,8 @@ import {
   Layers,
   BarChart3,
   Copy,
+  PauseCircle,
+  PlayCircle,
 } from "lucide-vue-next";
 import BaseButton from "@/components/BaseButton.vue";
 import categoryService from "@/services/categoryService";
@@ -163,6 +165,24 @@ const removeProduct = async (id) => {
     }
   }
 };
+
+const toggleProductStatus = async (item) => {
+  const isAvailable = item.status === 'AVAILABLE';
+  const newStatus = isAvailable ? 'UNAVAILABLE' : 'AVAILABLE';
+  try {
+    await productService.updateAvailability(item.id, {
+      status: newStatus,
+      availableDigitalMenu: newStatus === 'AVAILABLE',
+      availablePdv: newStatus === 'AVAILABLE'
+    });
+    item.status = newStatus;
+    item.availableDigitalMenu = newStatus === 'AVAILABLE';
+    item.availablePdv = newStatus === 'AVAILABLE';
+  } catch (err) {
+    console.error("Erro ao alterar status do produto", err);
+    alert("Erro ao alterar status do produto.");
+  }
+};
 </script>
 
 <template>
@@ -254,13 +274,19 @@ const removeProduct = async (id) => {
             >
               <td class="px-6 py-4">
                 <div class="flex items-center gap-3">
-                  <div class="p-2 bg-orange-50 rounded-xl text-orange-600">
+                  <div class="p-2 bg-orange-50 rounded-xl text-orange-600" :class="{ 'opacity-50 grayscale': item.status === 'UNAVAILABLE' }">
                     <ShoppingBag :size="16" />
                   </div>
-                  <span
-                    class="font-bold text-slate-700 group-hover:text-orange-600 transition-colors"
-                    >{{ item.name }}</span
-                  >
+                  <div class="flex flex-col">
+                    <span
+                      class="font-bold text-slate-700 group-hover:text-orange-600 transition-colors"
+                      :class="{ 'line-through text-slate-400': item.status === 'UNAVAILABLE' }"
+                      >{{ item.name }}</span
+                    >
+                    <span v-if="item.status === 'UNAVAILABLE'" class="text-[10px] font-bold text-red-500 uppercase tracking-wider">
+                      Pausado
+                    </span>
+                  </div>
                 </div>
               </td>
               <td class="px-6 py-4">
@@ -292,6 +318,15 @@ const removeProduct = async (id) => {
               </td>
               <td class="px-6 py-4 text-right">
                 <div class="flex justify-end gap-2">
+                  <button
+                    @click="toggleProductStatus(item)"
+                    class="p-2 rounded-lg transition-all"
+                    :class="item.status === 'AVAILABLE' ? 'text-amber-500 hover:bg-amber-50' : 'text-emerald-500 hover:bg-emerald-50'"
+                    :title="item.status === 'AVAILABLE' ? 'Pausar Produto' : 'Ativar Produto'"
+                  >
+                    <PauseCircle v-if="item.status === 'AVAILABLE'" :size="16" />
+                    <PlayCircle v-else :size="16" />
+                  </button>
                   <button
                     @click="router.push(`/produtos/novo?cloneId=${item.id}`)"
                     class="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"

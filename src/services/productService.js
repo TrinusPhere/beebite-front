@@ -14,5 +14,7 @@ export const productService = {
     (await api.put(`/products/${id}/removable-items`, ingredientIds)).data,
   updateModifierGroups: async (id, groupIds) =>
     (await api.put(`/products/${id}/modifier-groups`, groupIds)).data,
+  updateAvailability: async (id, data) =>
+    (await api.put(`/products/${id}/availability`, data)).data,
   getCategories: async () => (await api.get("/products/categories")).data,
 };

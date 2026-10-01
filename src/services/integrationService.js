@@ -5,8 +5,17 @@ export const integrationService = {
   saveWhatsapp: async (data) =>
     (await api.put("/integrations/whatsapp", data)).data,
   saveIfood: async (data) => (await api.put("/integrations/ifood", data)).data,
-  authorizeIfood: async () =>
-    (await api.post("/integrations/ifood/authorize")).data,
+  authorizeIfood: async (storeId, data) => {
+    if (data.clientId && data.clientSecret) {
+      await api.post("/ifood/credentials", {
+        storeId: storeId,
+        clientId: data.clientId,
+        clientSecret: data.clientSecret,
+        merchantId: data.merchantId || ""
+      });
+    }
+    return (await api.post("/integrations/ifood/authorize")).data;
+  },
   toggleIfoodStore: async (open) =>
     (await api.patch("/integrations/ifood/store-status", { open })).data,
   
