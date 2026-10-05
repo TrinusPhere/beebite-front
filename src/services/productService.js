@@ -1,9 +1,10 @@
 import api from "./api";
 
 export const productService = {
-  getAll: async (category, page = 0, size = 20) => {
+  getAll: async (category, page = 0, size = 20, pendingCost = false) => {
     let url = `/products?page=${page}&size=${size}`;
     if (category) url += `&categoryId=${encodeURIComponent(category)}`;
+    if (pendingCost) url += `&pendingCost=true`;
     return (await api.get(url)).data;
   },
   getById: async (id) => (await api.get(`/products/${id}`)).data,

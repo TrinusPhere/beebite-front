@@ -118,6 +118,7 @@ const form = reactive({
   availablePdv: true,
   categoryId: "",
   price: 0,
+  estimatedCost: null,
   technicalSheet: [],
   modifierGroupIds: [],
   removableItemIds: [],
@@ -173,18 +174,24 @@ onMounted(async () => {
 });
 
 const totalCost = computed(() => {
-  return form.technicalSheet.reduce((acc, item) => {
-    const ing = availableIngredients.value.find(
-      (i) => i.id === item.ingredientId || i.id === item.id,
-    );
-    if (ing) {
-      return acc + ing.costPrice * item.quantity;
-    }
-    return acc;
-  }, 0);
+  if (form.technicalSheet && form.technicalSheet.length > 0) {
+    return form.technicalSheet.reduce((acc, item) => {
+      const ing = availableIngredients.value.find(
+        (i) => i.id === item.ingredientId || i.id === item.id,
+      );
+      if (ing) {
+        return acc + ing.costPrice * item.quantity;
+      }
+      return acc;
+    }, 0);
+  }
+  return form.estimatedCost ? parseFloat(form.estimatedCost) : 0;
 });
 
+const channelFeeRate = ref(0);
+
 const profit = computed(() => form.price - totalCost.value);
+const netProfit = computed(() => profit.value - (form.price * (channelFeeRate.value / 100)));
 
 const removeIngredient = (index) => form.technicalSheet.splice(index, 1);
 
@@ -440,6 +447,12 @@ const handlePriceInput = (event) => {
   event.target.value = hasDigits ? formatPrice(form.price) : "";
 };
 
+const handleEstimatedCostInput = (event) => {
+  const hasDigits = /\d/.test(event.target.value);
+  form.estimatedCost = parseCurrencyInput(event.target.value);
+  event.target.value = hasDigits ? formatPrice(form.estimatedCost) : "";
+};
+
 const formatCurrency = (value) => {
   return Number(value || 0).toLocaleString("pt-BR", {
     style: "currency",
@@ -632,13 +645,35 @@ const handleNewIngredientCost = (event) => {
           <div class="space-y-4">
             <div class="flex justify-between items-center text-sm">
               <span class="text-slate-400">Custo Total</span>
-              <span class="font-bold">R$ {{ totalCost.toFixed(2) }}</span>
+              <span class="font-bold" v-if="form.technicalSheet && form.technicalSheet.length > 0">
+                R$ {{ totalCost.toFixed(2) }}
+              </span>
+              <input
+                v-else
+                type="text"
+                :value="formatPrice(form.estimatedCost)"
+                @input="handleEstimatedCostInput"
+                class="w-24 text-right bg-slate-800 border-none rounded text-white font-bold px-2 py-1 focus:ring-2 focus:ring-orange-500"
+                placeholder="R$ 0,00"
+              />
             </div>
             <div class="flex justify-between items-center text-sm">
               <span class="text-slate-400">Venda</span>
               <span class="font-bold"
                 >R$ {{ Number(form.price).toFixed(2) }}</span
               >
+            </div>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400">Taxa do Canal (%)</span>
+              <div class="flex items-center gap-1">
+                <input
+                  type="number"
+                  v-model.number="channelFeeRate"
+                  class="w-16 text-right bg-slate-800 border-none rounded text-white font-bold px-2 py-1 focus:ring-2 focus:ring-orange-500"
+                  placeholder="0"
+                />
+                <span class="text-slate-400 font-bold">%</span>
+              </div>
             </div>
             <div class="pt-4 border-t border-slate-800">
               <div class="flex justify-between items-center mb-1">
@@ -649,10 +684,10 @@ const handleNewIngredientCost = (event) => {
                 <span
                   :class="[
                     'text-xl font-black',
-                    profit > 0 ? 'text-emerald-400' : 'text-red-400',
+                    netProfit > 0 ? 'text-emerald-400' : 'text-red-400',
                   ]"
                 >
-                  {{ formatCurrency(profit) }}
+                  {{ formatCurrency(netProfit) }}
                 </span>
               </div>
             </div>

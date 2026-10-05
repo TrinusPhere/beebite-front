@@ -23,6 +23,7 @@ const searchQuery = ref("");
 const products = ref([]);
 const availableCategories = ref([]);
 const selectedCategoryId = ref("");
+const pendingCostFilter = ref(false);
 const modifierGroups = ref([]);
 
 // Paginação
@@ -44,6 +45,8 @@ const loadProducts = async () => {
     const response = await productService.getAll(
       selectedCategoryId.value,
       currentPage.value,
+      20,
+      pendingCostFilter.value
     );
     products.value = response.content || [];
     currentPage.value = response.page || 0;
@@ -250,6 +253,15 @@ const toggleProductStatus = async (item) => {
           >
             <Edit2 :size="18" />
           </button>
+          <label class="flex items-center gap-2 text-sm text-slate-600 ml-2 cursor-pointer font-medium hover:text-slate-900">
+            <input 
+              type="checkbox" 
+              v-model="pendingCostFilter" 
+              @change="currentPage = 0; loadProducts();"
+              class="w-4 h-4 text-orange-500 rounded border-slate-300 focus:ring-orange-500"
+            />
+            Pendentes de Custo
+          </label>
         </div>
       </div>
 
