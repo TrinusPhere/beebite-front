@@ -71,10 +71,20 @@ const fetchKanban = async () => {
   }
 };
 
+let kanbanInterval = null;
+
 onMounted(() => {
   fetchKanban();
   loadDrivers();
   loadChatContext();
+  
+  kanbanInterval = setInterval(() => {
+    fetchKanban();
+  }, 10000);
+});
+
+onUnmounted(() => {
+  if (kanbanInterval) clearInterval(kanbanInterval);
 });
 
 const formatTime = (isoString) => {
