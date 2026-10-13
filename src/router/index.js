@@ -18,7 +18,6 @@ import AcertoEntregadores from "../views/entregadores/AcertoEntregadores.vue";
 import Financeiro from "../views/financeiro/Financeiro.vue";
 import UsuariosView from "../views/usuarios/Usuarios.vue";
 import CadastroUsuario from "@/views/usuarios/CadastroUsuario.vue";
-import CardapioDigital from "../views/cardapio/CardapioDigital.vue";
 import Integracoes from "../views/integracoes/Integracoes.vue";
 import IfoodCatalogSync from "../views/integracoes/IfoodCatalogSync.vue";
 import CMV from "../views/financeiro/CMV.vue";
@@ -42,12 +41,6 @@ const router = createRouter({
       path: "/avaliar/:orderId",
       name: "avaliar-pedido",
       component: AvaliacaoPedido,
-      meta: { public: true },
-    },
-    {
-      path: "/cardapio/:storeName",
-      name: "cardapio-digital",
-      component: CardapioDigital,
       meta: { public: true },
     },
     {

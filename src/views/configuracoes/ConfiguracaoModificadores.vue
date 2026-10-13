@@ -204,109 +204,142 @@
     <!-- ═══════════════════════════════════════════════ -->
     <!-- ABA 2: Adicionais Globais                       -->
     <!-- ═══════════════════════════════════════════════ -->
-    <div v-if="activeTab === 'adicionais'" class="space-y-4">
-      <div class="flex items-center justify-between">
-        <p class="text-slate-500 text-sm">
-          Catálogo global de adicionais que podem ser usados em qualquer grupo
-          de modificadores.
+    <div v-if="activeTab === 'adicionais'" class="space-y-5">
+      <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <p class="text-slate-600 text-sm font-medium">
+          Cadastre os adicionais que podem ser oferecidos nos pedidos e defina seus preços de venda.
         </p>
         <button
           @click="openAdditionalModal(null)"
-          class="flex items-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-orange-600 transition-all shadow-sm shadow-orange-500/20 shrink-0 ml-4"
+          class="flex items-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-orange-600 transition-all shadow-sm shadow-orange-500/20 shrink-0"
         >
           <Plus :size="16" /> Novo Adicional
         </button>
       </div>
 
-      <!-- Tabela de adicionais -->
-      <div
-        class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm"
-      >
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-slate-100 bg-slate-50">
-              <th
-                class="text-left px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest"
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+        <div class="relative flex-1">
+          <Search :size="16" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            v-model="searchAdditionalQuery"
+            type="text"
+            placeholder="Buscar por nome ou categoria..."
+            class="w-full pl-9 pr-4 py-2 rounded-xl text-sm border border-slate-200 focus:border-orange-400 outline-none transition-all placeholder:text-slate-400"
+          />
+        </div>
+
+        <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0 overflow-x-auto">
+          <button
+            v-for="f in [
+              { id: 'all', label: 'Todos' },
+              { id: 'active', label: 'Ativos' },
+              { id: 'inactive', label: 'Pausados' }
+            ]"
+            :key="f.id"
+            @click="additionalFilterTab = f.id"
+            :class="[
+              'px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap',
+              additionalFilterTab === f.id
+                ? 'bg-white text-orange-600 shadow-xs'
+                : 'text-slate-500 hover:text-slate-700'
+            ]"
+          >
+            {{ f.label }}
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-100 bg-slate-50/80">
+                <th class="text-left px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest">Adicional</th>
+                <th class="text-left px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest">Categoria</th>
+                <th class="text-left px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest">Preço</th>
+                <th class="text-center px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                <th class="px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr
+                v-for="item in filteredAdditionals"
+                :key="item.id"
+                class="hover:bg-slate-50/70 transition-colors"
               >
-                Nome
-              </th>
-              <th
-                class="text-left px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest"
-              >
-                Tipo
-              </th>
-              <th
-                class="text-left px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest"
-              >
-                Preço
-              </th>
-              <th
-                class="text-left px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest"
-              >
-                Status
-              </th>
-              <th
-                class="px-5 py-3.5 text-xs font-bold text-slate-400 uppercase tracking-widest text-right"
-              >
-                Ações
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            <tr
-              v-for="add in additionalsDB"
-              :key="add.id"
-              class="hover:bg-slate-50/50 transition-colors"
-            >
-              <td class="px-5 py-3.5 font-semibold text-slate-800">
-                {{ add.name }}
-              </td>
-              <td class="px-5 py-3.5">
-                <span
-                  class="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded-lg font-medium"
-                  >{{ add.category }}</span
-                >
-              </td>
-              <td class="px-5 py-3.5 font-black text-emerald-600">
-                +R$ {{ add.price.toFixed(2) }}
-              </td>
-              <td class="px-5 py-3.5">
-                <button
-                  @click="toggleAdditionalStatus(add)"
-                  :class="
-                    add.active
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-slate-100 text-slate-400'
-                  "
-                  class="text-xs font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
-                >
-                  {{ add.active ? "● Ativo" : "○ Inativo" }}
-                </button>
-              </td>
-              <td class="px-5 py-3.5 text-right">
-                <div class="flex items-center justify-end gap-1">
-                  <button
-                    @click="openAdditionalModal(add)"
-                    class="p-1.5 rounded-lg text-slate-400 hover:text-orange-500 hover:bg-orange-50 transition-all"
-                  >
-                    <Pencil :size="14" />
-                  </button>
-                  <button
-                    @click="deleteAdditional(add.id)"
-                    class="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
-                  >
-                    <Trash2 :size="14" />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                <td class="px-5 py-3.5">
+                  <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-orange-100 text-orange-600">
+                      <Sparkles :size="16" />
+                    </div>
+                    <p class="font-bold text-slate-800 leading-snug">{{ item.name }}</p>
+                  </div>
+                </td>
+                <td class="px-5 py-3.5">
+                  <span class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg font-semibold inline-block">
+                    {{ item.category || 'Adicionais' }}
+                  </span>
+                </td>
+                <td class="px-5 py-3.5">
+                  <span class="text-sm font-black text-emerald-600">
+                    +R$ {{ Number(item.price || 0).toFixed(2) }}
+                  </span>
+                </td>
+                <td class="px-5 py-3.5 text-center">
+                  <div class="flex items-center justify-center gap-2">
+                    <button
+                      @click="toggleAdditionalStatus(item)"
+                      :class="[
+                        'relative w-11 h-6 rounded-full transition-all duration-300 shrink-0',
+                        item.active ? 'bg-orange-500' : 'bg-slate-200'
+                      ]"
+                      :title="item.active ? 'Pausar adicional' : 'Ativar adicional'"
+                    >
+                      <span
+                        :class="[
+                          'absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-300',
+                          item.active ? 'translate-x-5' : 'translate-x-0'
+                        ]"
+                      />
+                    </button>
+                    <span
+                      class="text-xs font-bold hidden sm:inline-block w-14 text-left"
+                      :class="item.active ? 'text-emerald-600' : 'text-slate-400'"
+                    >
+                      {{ item.active ? 'Ativo' : 'Pausado' }}
+                    </span>
+                  </div>
+                </td>
+                <td class="px-5 py-3.5 text-right">
+                  <div class="flex items-center justify-end gap-1">
+                    <button
+                      @click="openAdditionalModal(item)"
+                      class="p-2 rounded-xl text-slate-400 hover:text-orange-500 hover:bg-orange-50 transition-all"
+                      title="Editar adicional"
+                    >
+                      <Pencil :size="15" />
+                    </button>
+                    <button
+                      @click="deleteAdditional(item.id)"
+                      class="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                      title="Excluir adicional"
+                    >
+                      <Trash2 :size="15" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
         <div
-          v-if="!additionalsDB.length"
-          class="text-center py-16 text-slate-400"
+          v-if="filteredAdditionals.length === 0"
+          class="text-center py-16 text-slate-400 space-y-2"
         >
-          <p class="font-medium">Nenhum adicional cadastrado.</p>
+          <Boxes :size="40" class="mx-auto mb-2 opacity-30" />
+          <p class="font-medium text-slate-500">Nenhum adicional encontrado.</p>
+          <p class="text-xs text-slate-400">Use o botão Novo Adicional para cadastrar.</p>
         </div>
       </div>
     </div>
@@ -740,18 +773,23 @@
           <Transition name="modal-slide">
             <div
               v-if="showAdditionalModal"
-              class="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden"
+              class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
             >
               <div
                 class="p-6 border-b border-slate-100 flex items-center justify-between"
               >
-                <h3 class="font-black text-slate-800">
-                  {{
-                    editingAdditional?.id
-                      ? "Editar Adicional"
-                      : "Novo Adicional"
-                  }}
-                </h3>
+                <div>
+                  <h3 class="font-black text-slate-800 text-lg">
+                    {{
+                      editingAdditional?.id
+                        ? "Editar Adicional"
+                        : "Novo Adicional"
+                    }}
+                  </h3>
+                  <p class="text-xs text-slate-400 mt-0.5">
+                    Configure os dados do adicional e a saída de estoque por venda
+                  </p>
+                </div>
                 <button
                   @click="closeAdditionalModal"
                   class="p-2 rounded-xl text-slate-400 hover:bg-slate-100"
@@ -759,47 +797,110 @@
                   <X :size="18" />
                 </button>
               </div>
+
               <div class="p-6 space-y-4">
                 <div>
                   <label
                     class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider"
-                    >Nome *</label
+                    >Nome do Adicional *</label
                   >
                   <input
                     v-model="additionalForm.name"
                     type="text"
-                    placeholder="Ex: Queijo Coalho"
-                    class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-orange-400 outline-none"
+                    placeholder="Ex: Blend de 160g, Bacon Crocante"
+                    class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:border-orange-400 outline-none transition-all placeholder:font-normal"
                   />
                 </div>
-                <div>
-                  <label
-                    class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider"
-                    >Tipo de Adicional</label
-                  >
-                  <input
-                    v-model="additionalForm.category"
-                    type="text"
-                    placeholder="Ex: Queijos, Carnes..."
-                    class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-orange-400 outline-none"
-                  />
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label
+                      class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider"
+                      >Tipo / Categoria</label
+                    >
+                    <input
+                      v-model="additionalForm.category"
+                      type="text"
+                      placeholder="Ex: Queijos, Carnes, Molhos..."
+                      class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-orange-400 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider"
+                      >Preço de Venda (R$) *</label
+                    >
+                    <input
+                      :value="formatCurrencyInput(additionalForm.price)"
+                      @input="handleAdditionalPriceInput"
+                      type="text"
+                      inputmode="numeric"
+                      min="0"
+                      placeholder="R$ 0,00"
+                      class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-emerald-700 focus:border-orange-400 outline-none"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label
-                    class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider"
-                    >Preço (R$) *</label
-                  >
-                  <input
-                    :value="formatCurrencyInput(additionalForm.price)"
-                    @input="handleAdditionalPriceInput"
-                    type="text"
-                    inputmode="numeric"
-                    min="0"
-                    placeholder="R$ 0,00"
-                    class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-orange-400 outline-none"
-                  />
+
+                <!-- 2 Novos Campos: Ingrediente Cadastrado e Quantidade a Debitar do Estoque -->
+                <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                  <div class="flex items-center gap-2">
+                    <Boxes :size="15" class="text-orange-500" />
+                    <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Baixa de Estoque por Venda
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                    <!-- 1 - Escolho o ingrediente cadastrado -->
+                    <div class="sm:col-span-8">
+                      <label class="block text-xs font-semibold text-slate-600 mb-1">
+                        Ingrediente Cadastrado
+                      </label>
+                      <select
+                        v-model="additionalForm.ingredientId"
+                        class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:border-orange-400 outline-none cursor-pointer"
+                      >
+                        <option value="">Nenhum (Sem baixa de estoque)</option>
+                        <option
+                          v-for="ing in ingredientsDB"
+                          :key="ing.id"
+                          :value="ing.id"
+                        >
+                          {{ ing.name }} (Estoque: {{ ing.stock }} {{ ing.unit }})
+                        </option>
+                      </select>
+                    </div>
+
+                    <!-- 2 - Informo a quantidade que deve ser debitada -->
+                    <div class="sm:col-span-4">
+                      <label class="block text-xs font-semibold text-slate-600 mb-1">
+                        Qtd a Debitar
+                      </label>
+                      <div class="flex items-center gap-1.5">
+                        <input
+                          v-model.number="additionalForm.ingredientQuantity"
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder="0.00"
+                          :disabled="!additionalForm.ingredientId"
+                          class="w-full p-2.5 text-center text-sm font-bold bg-white border border-slate-200 rounded-xl focus:border-orange-400 outline-none disabled:bg-slate-100 disabled:text-slate-400"
+                        />
+                        <span class="text-xs font-black text-slate-500 uppercase shrink-0 min-w-[28px]">
+                          {{ selectedModalIngredient?.unit || 'UN' }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p v-if="selectedModalIngredient && additionalForm.ingredientQuantity > 0" class="text-[11px] text-slate-500 mt-1">
+                    Ao vender 1 adicional, será debitado <strong>{{ additionalForm.ingredientQuantity }} {{ selectedModalIngredient.unit }}</strong> do estoque de <strong>{{ selectedModalIngredient.name }}</strong>.
+                  </p>
                 </div>
               </div>
+
               <div class="px-6 pb-6 flex gap-3">
                 <button
                   @click="closeAdditionalModal"
@@ -809,9 +910,9 @@
                 </button>
                 <button
                   @click="saveAdditional"
-                  class="flex-[2] py-3 rounded-xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-600"
+                  class="flex-[2] py-3 rounded-xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-600 transition-all shadow-md shadow-orange-500/20"
                 >
-                  Salvar
+                  Salvar Adicional
                 </button>
               </div>
             </div>
@@ -835,15 +936,26 @@ import {
   Boxes,
   ListChecks,
   MinusCircle,
+  Search,
+  Package,
+  Check,
+  Sparkles,
 } from "lucide-vue-next";
 import { modifierGroupService } from "@/services/modifierGroupService";
 import { additionalService } from "@/services/additionalService";
+import { ingredientService } from "@/services/ingredientService";
 import { productService } from "@/services/productService";
 import { formatCurrencyInput, parseCurrencyInput } from "@/utils/money";
 
 const modifierGroupsDB = ref([]);
 const additionalsDB = ref([]);
+const ingredientsDB = ref([]);
 const productsDB = ref([]);
+
+// Pesquisa e Filtros da Aba de Adicionais
+const searchAdditionalQuery = ref("");
+const additionalFilterTab = ref("all"); // 'all' | 'active' | 'not_configured'
+const selectedIngredientForModal = ref(null);
 
 // Pesquisa e Paginação de Grupos
 const searchGroupQuery = ref("");
@@ -879,11 +991,38 @@ const additionalsByCategory = computed(() => {
   return groups;
 });
 
+const filteredAdditionals = computed(() => {
+  let list = additionalsDB.value;
+
+  if (searchAdditionalQuery.value.trim()) {
+    const q = searchAdditionalQuery.value.toLowerCase().trim();
+    list = list.filter(
+      (item) =>
+        item.name.toLowerCase().includes(q) ||
+        (item.category && item.category.toLowerCase().includes(q))
+    );
+  }
+
+  if (additionalFilterTab.value === "active") {
+    list = list.filter((item) => item.active);
+  } else if (additionalFilterTab.value === "inactive") {
+    list = list.filter((item) => !item.active);
+  }
+
+  return list;
+});
+
 onMounted(async () => {
   try {
-    modifierGroupsDB.value = await modifierGroupService.getAll();
-    additionalsDB.value = await additionalService.getAll();
-    const pResponse = await productService.getAll(null, 0, 1000);
+    const [modGroups, adds, ings, pResponse] = await Promise.all([
+      modifierGroupService.getAll(),
+      additionalService.getAll(),
+      ingredientService.getAll(),
+      productService.getAll(null, 0, 1000),
+    ]);
+    modifierGroupsDB.value = modGroups || [];
+    additionalsDB.value = adds || [];
+    ingredientsDB.value = ings || [];
     productsDB.value = (pResponse.content || []).map((p) => ({
       ...p,
       removableItemIds: (p.removableItems || []).map((r) => r.ingredientId),
@@ -1046,18 +1185,49 @@ const deleteGroup = async (groupId) => {
 const showAdditionalModal = ref(false);
 const editingAdditional = ref(null);
 
-const additionalForm = ref({ name: "", category: "", price: 0 });
+const additionalForm = ref({
+  name: "",
+  category: "",
+  price: 0,
+  ingredientId: "",
+  ingredientQuantity: null,
+});
+
+const selectedModalIngredient = computed(() => {
+  if (!additionalForm.value.ingredientId) return null;
+  return ingredientsDB.value.find((i) => i.id === additionalForm.value.ingredientId) || null;
+});
 
 const openAdditionalModal = (add) => {
   editingAdditional.value = add;
   additionalForm.value = add
-    ? { name: add.name, category: add.category, price: add.price }
-    : { name: "", category: "", price: 0 };
+    ? {
+        name: add.name || "",
+        category: add.category || "",
+        price: add.price || 0,
+        ingredientId: add.ingredientId || "",
+        ingredientQuantity: add.ingredientQuantity != null ? add.ingredientQuantity : null,
+      }
+    : {
+        name: "",
+        category: "",
+        price: 0,
+        ingredientId: "",
+        ingredientQuantity: null,
+      };
   showAdditionalModal.value = true;
 };
 
 const closeAdditionalModal = () => {
   showAdditionalModal.value = false;
+  editingAdditional.value = null;
+  additionalForm.value = {
+    name: "",
+    category: "",
+    price: 0,
+    ingredientId: "",
+    ingredientQuantity: null,
+  };
 };
 
 const saveAdditional = async () => {
@@ -1070,14 +1240,25 @@ const saveAdditional = async () => {
     return;
   }
 
+  const payload = {
+    name: additionalForm.value.name.trim(),
+    category: additionalForm.value.category ? additionalForm.value.category.trim() : "Adicionais",
+    price: Number(additionalForm.value.price) || 0,
+  };
+
+  if (additionalForm.value.ingredientId) {
+    payload.ingredientId = additionalForm.value.ingredientId;
+    payload.ingredientQuantity = Number(additionalForm.value.ingredientQuantity) || 0;
+  }
+
   try {
     if (editingAdditional.value) {
       await additionalService.update(
         editingAdditional.value.id,
-        additionalForm.value,
+        payload,
       );
     } else {
-      await additionalService.create(additionalForm.value);
+      await additionalService.create(payload);
     }
     additionalsDB.value = await additionalService.getAll();
     closeAdditionalModal();

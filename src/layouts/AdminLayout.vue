@@ -2,11 +2,13 @@
 import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import Sidebar from "../components/ui/Sidebar.vue";
-import { Bell, Search, UserCircle, Menu, X, LogOut } from "lucide-vue-next";
+import { Bell, Search, UserCircle, Menu, X, LogOut, Settings } from "lucide-vue-next";
 import { authState } from "../utils/auth";
+import StoreSettingsModal from "../components/StoreSettingsModal.vue";
 
 const router = useRouter();
 const isMobileMenuOpen = ref(false);
+const isStoreSettingsOpen = ref(false);
 
 const toggleMobileMenu = () => {
   isMobileMenuOpen.value = !isMobileMenuOpen.value;
@@ -77,6 +79,14 @@ const handleLogout = () => {
 
         <div class="flex items-center gap-2 md:gap-6">
           <button
+            @click="isStoreSettingsOpen = true"
+            class="p-2 text-slate-400 hover:text-orange-500 transition-colors"
+            title="Configurações da Loja"
+          >
+            <Settings :size="20" />
+          </button>
+
+          <button
             class="p-2 text-slate-400 hover:text-orange-500 transition-colors relative"
           >
             <Bell :size="20" />
@@ -123,6 +133,11 @@ const handleLogout = () => {
         </router-view>
       </div>
     </main>
+
+    <StoreSettingsModal 
+      v-if="isStoreSettingsOpen" 
+      @close="isStoreSettingsOpen = false" 
+    />
   </div>
 </template>
 

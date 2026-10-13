@@ -71,10 +71,20 @@ const fetchKanban = async () => {
   }
 };
 
+let kanbanInterval = null;
+
 onMounted(() => {
   fetchKanban();
   loadDrivers();
   loadChatContext();
+  
+  kanbanInterval = setInterval(() => {
+    fetchKanban();
+  }, 10000);
+});
+
+onUnmounted(() => {
+  if (kanbanInterval) clearInterval(kanbanInterval);
 });
 
 const formatTime = (isoString) => {
@@ -308,7 +318,7 @@ const onDrop = (event, toColIndex) => {
     const driverName = getDriverName(order) || "Não aplicável (Balcão)";
     setTimeout(() => {
       alert(
-        `Mensagem automática enviada via WhatsApp para o cliente ${order.customerName} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`,
+        `Mensagem automática enviada via WhatsApp para o cliente ${order.customerName}${order.customerPhone ? ` (${order.customerPhone})` : ""} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`,
       );
     }, 500);
   }
@@ -463,7 +473,7 @@ const moveOrder = (orderId, currentColumnIndex) => {
         // Simulação do envio de mensagem de avaliação
         setTimeout(() => {
           alert(
-            `Mensagem automática enviada via WhatsApp para o cliente ${order.customerName} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`,
+            `Mensagem automática enviada via WhatsApp para o cliente ${order.customerName}${order.customerPhone ? ` (${order.customerPhone})` : ""} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`,
           );
         }, 500);
       }
