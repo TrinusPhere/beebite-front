@@ -20,9 +20,18 @@
         <!-- Header -->
         <div class="bg-slate-900 p-6 text-center shrink-0">
           <h2 class="text-2xl font-black text-white">Avalie seu pedido</h2>
-          <p class="text-slate-400 text-sm mt-1">
-            Pedido #{{ orderId }} entregue por {{ driverName }}
+          <p v-if="loadError" class="text-red-300 text-sm mt-1">
+            Não foi possível carregar os dados do pedido.
           </p>
+          <template v-else>
+            <p class="text-slate-400 text-sm mt-1">
+              Pedido #{{ orderId }}
+              <template v-if="driverName"> entregue por {{ driverName }}</template>
+            </p>
+            <p v-if="customerName" class="text-slate-500 text-xs mt-1">
+              {{ customerName }}<template v-if="customerPhone"> · {{ customerPhone }}</template>
+            </p>
+          </template>
         </div>
 
         <div class="p-6 overflow-y-auto space-y-8 h-full max-h-[70vh]">
@@ -101,13 +110,31 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { useRoute } from "vue-router";
 import { CheckCircle2, Send } from "lucide-vue-next";
+import { reviewService } from "@/services/reviewService";
 import StarRating from "@/components/ui/StarRating.vue";
 
-// Em um cenário real, estes viriam da rota (params/query)
-const orderId = ref("1024");
-const driverName = ref("Carlos Silva");
+const route = useRoute();
+const routeOrderId = route.params.orderId;
+const orderId = ref("");
+const driverName = ref("");
+const customerName = ref("");
+const customerPhone = ref("");
+const loadError = ref(false);
+
+onMounted(async () => {
+  try {
+    const info = await reviewService.getOrderInfo(routeOrderId);
+    orderId.value = info.displayId || info.orderId;
+    driverName.value = info.driverName || "";
+    customerName.value = info.customerName || "";
+    customerPhone.value = info.customerPhone || "";
+  } catch (e) {
+    loadError.value = true;
+  }
+});
 
 const ratings = ref({
   atendimento: 0,

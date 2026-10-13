@@ -268,6 +268,15 @@ const handleSubmit = async () => {
   try {
     const payload = { ...form };
 
+    if (payload.productType === "RESALE") {
+      payload.trackStock = true;
+      payload.stock = Math.max(0, Math.trunc(Number(payload.stock) || 0));
+      payload.technicalSheet = [];
+      payload.removableItemIds = [];
+    } else {
+      payload.trackStock = false;
+    }
+
     payload.technicalSheet = payload.technicalSheet.map((i) => ({
       ingredientId: i.ingredientId || i.id,
       quantity: i.quantity,
@@ -866,10 +875,21 @@ const handleNewIngredientCost = (event) => {
                 ><input v-model="form.active" type="checkbox" /> Produto
                 ativo</label
               >
-              <label class="flex items-center gap-2 text-sm font-bold"
-                ><input v-model="form.trackStock" type="checkbox" /> Controlar
-                estoque próprio</label
-              >
+              <div v-if="form.productType === 'RESALE'" class="space-y-1">
+                <label class="text-xs font-bold text-slate-700"
+                  >Estoque atual (unidades)</label
+                >
+                <input
+                  v-model.number="form.stock"
+                  type="number"
+                  min="0"
+                  step="1"
+                  class="w-full bg-white border border-slate-200 p-3 rounded-xl font-bold"
+                />
+                <p class="text-[11px] text-slate-400">
+                  O estoque é debitado automaticamente a cada venda.
+                </p>
+              </div>
               <label class="flex items-center gap-2 text-sm font-bold"
                 ><input v-model="form.availablePdv" type="checkbox" />
                 Disponível no PDV</label
@@ -950,6 +970,7 @@ const handleNewIngredientCost = (event) => {
           </div>
         </div>
 
+        <template v-if="form.productType === 'PRODUCED'">
         <!-- Ficha Técnica -->
         <div
           class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6"
@@ -1051,6 +1072,7 @@ const handleNewIngredientCost = (event) => {
             Adicione itens na ficha técnica primeiro.
           </div>
         </div>
+        </template>
       </div>
     </div>
 

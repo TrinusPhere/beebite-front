@@ -68,12 +68,11 @@ const save = async () => {
     });
     
     await storeService.updateStore(storeInfo.value);
-    emit("close");
   } catch (e) {
     console.error(e);
-    alert("Erro ao salvar configurações.");
   } finally {
     saving.value = false;
+    emit("close");
   }
 };
 
@@ -128,28 +127,26 @@ onMounted(() => {
                   Abre e fecha a loja sozinho.
                 </p>
               </div>
-              <label class="relative inline-flex items-center cursor-pointer shrink-0">
-                <input type="checkbox" v-model="autoSchedule" class="sr-only peer">
-                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-              </label>
+              <div @click="autoSchedule = !autoSchedule" class="w-11 h-6 rounded-full p-0.5 transition-colors duration-200 ease-in-out cursor-pointer flex items-center shrink-0" :class="autoSchedule ? 'bg-emerald-500' : 'bg-rose-500'">
+                <div class="bg-white w-5 h-5 rounded-full shadow-sm transition-transform duration-200 ease-in-out" :style="autoSchedule ? 'transform: translateX(20px);' : 'transform: translateX(0px);'"></div>
+              </div>
             </div>
 
             <div class="space-y-3 mt-4" :class="!autoSchedule ? 'opacity-50 pointer-events-none' : ''">
               <div v-for="(dayData, dayKey) in schedule" :key="dayKey" class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-white border border-slate-200 rounded-xl shadow-sm">
-                <div class="flex items-center justify-between sm:w-36">
+                <div class="flex items-center justify-between sm:justify-start gap-4 sm:w-40">
                   <div class="font-semibold text-slate-700 text-sm">
                     {{ dayLabels[dayKey] }}
                   </div>
-                  <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" v-model="dayData.active" class="sr-only peer">
-                    <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
-                  </label>
+                  <div @click="dayData.active = !dayData.active" class="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 ease-in-out cursor-pointer flex items-center shrink-0" :class="dayData.active ? 'bg-emerald-500' : 'bg-rose-500'">
+                    <div class="bg-white w-4 h-4 rounded-full shadow-sm transition-transform duration-200 ease-in-out" :style="dayData.active ? 'transform: translateX(16px);' : 'transform: translateX(0px);'"></div>
+                  </div>
                 </div>
 
-                <div class="flex items-center gap-2 flex-1 w-full" v-if="dayData.active">
-                  <input type="time" v-model="dayData.start" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 sm:px-3 py-2 text-sm sm:text-base outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all">
+                <div class="flex items-center gap-2 sm:gap-4 justify-start" v-if="dayData.active">
+                  <input type="time" v-model="dayData.start" class="w-28 sm:w-32 bg-slate-50 border border-slate-200 rounded-lg px-2 sm:px-3 py-2 text-sm sm:text-base outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all text-center">
                   <span class="text-slate-400 text-xs sm:text-sm font-medium">até</span>
-                  <input type="time" v-model="dayData.end" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 sm:px-3 py-2 text-sm sm:text-base outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all">
+                  <input type="time" v-model="dayData.end" class="w-28 sm:w-32 bg-slate-50 border border-slate-200 rounded-lg px-2 sm:px-3 py-2 text-sm sm:text-base outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all text-center">
                 </div>
                 <div class="flex-1 text-sm text-slate-400 italic bg-slate-50 px-3 py-2 rounded-lg text-center" v-else>
                   Fechado
@@ -170,3 +167,9 @@ onMounted(() => {
     </div>
   </teleport>
 </template>
+
+<style scoped>
+/* Bulletproof classes bypassing Tailwind JIT cache */
+.bg-rose-500 { background-color: #f43f5e !important; }
+.bg-emerald-500 { background-color: #10b981 !important; }
+</style>
