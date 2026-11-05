@@ -107,8 +107,30 @@ export const normalizeOrderContext = (order = {}) => {
   return { operation, channel, serviceType, source };
 };
 
-export const isDeliveryOrder = (order) =>
-  normalizeOrderContext(order).operation === OPERATIONS.DELIVERY;
+export const isDeliveryOrder = (order = {}) => {
+  const ctx = normalizeOrderContext(order);
+  const service = String(order.serviceType || ctx.serviceType || "").toUpperCase();
+  const type = String(order.type || "").toUpperCase();
+  const operation = String(order.operation || ctx.operation || "").toUpperCase();
+
+  // Se for retirada no local, balcão, salão, mesa ou comanda, NÃO é entrega a domicílio com motoboy
+  if (
+    service === "RETIRADA" ||
+    service === "PICKUP" ||
+    service === "CONSUMO_LOCAL" ||
+    service === "MESA" ||
+    service === "COMANDA" ||
+    type === "BALCAO" ||
+    operation === "SALAO" ||
+    operation === "BALCAO"
+  ) {
+    return false;
+  }
+
+  return service === "ENTREGA" || operation === "DELIVERY" || type === "DELIVERY";
+};
+
+export const requiresDeliveryDriver = (order) => isDeliveryOrder(order);
 
 export const contextLabel = (value) =>
   String(value || "")

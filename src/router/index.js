@@ -28,6 +28,9 @@ import MovimentacoesEstoque from "../views/estoque/MovimentacoesEstoque.vue";
 import SetoresProducao from "../views/configuracoes/SetoresProducao.vue";
 import Impressoras from "../views/configuracoes/Impressoras.vue";
 import InteligenciaFinanceira from "../views/financeiro/InteligenciaFinanceira.vue";
+import KdsView from "../views/kds/KdsView.vue";
+import KdsSettingsView from "../views/kds/KdsSettingsView.vue";
+import ControleCaixa from "../views/caixa/ControleCaixa.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -234,7 +237,26 @@ const router = createRouter({
           component: InteligenciaFinanceira,
           meta: { requiresPermission: "financeiro" },
         },
+        {
+          path: "kds/configuracoes",
+          name: "kds-configuracoes",
+          alias: ["configuracoes/kds"],
+          component: KdsSettingsView,
+          meta: { requiresPermission: "kds" },
+        },
+        {
+          path: "caixa",
+          name: "caixa",
+          component: ControleCaixa,
+          meta: { requiresPermission: "caixa" },
+        },
       ],
+    },
+    {
+      path: "/kds",
+      name: "kds",
+      component: KdsView,
+      meta: { requiresAuth: true, requiresPermission: "kds" },
     },
   ],
 });

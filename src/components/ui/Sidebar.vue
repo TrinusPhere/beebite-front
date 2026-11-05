@@ -20,6 +20,9 @@ import {
   Factory,
   Printer,
   ChartNoAxesCombined,
+  Flame,
+  Monitor,
+  Wallet,
 } from "lucide-vue-next";
 import { authState } from "@/utils/auth";
 
@@ -34,6 +37,12 @@ const menuItems = [
     path: "/dashboard",
     icon: LayoutDashboard,
     permission: "dashboard",
+  },
+  {
+    name: "Caixa PDV",
+    path: "/caixa",
+    icon: Wallet,
+    permission: "caixa",
   },
   {
     name: "Financeiro",
@@ -58,6 +67,18 @@ const menuItems = [
     path: "/pedidos",
     icon: ClipboardList,
     permission: "pedidos",
+  },
+  {
+    name: "KDS / Cozinha",
+    path: "/kds",
+    icon: Flame,
+    permission: "kds",
+  },
+  {
+    name: "Config. KDS",
+    path: "/kds/configuracoes",
+    icon: Monitor,
+    permission: "kds",
   },
   { name: "Clientes", path: "/clientes", icon: Users, permission: "clientes" },
   {

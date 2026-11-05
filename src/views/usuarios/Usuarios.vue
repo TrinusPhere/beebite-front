@@ -39,6 +39,23 @@ const deleteUser = async (userId) => {
     }
   }
 };
+
+const permissionLabels = {
+  dashboard: "Dashboard",
+  caixa: "Caixa PDV",
+  pedidos: "Pedidos",
+  kds: "KDS (Cozinha)",
+  produtos: "Produtos",
+  ingredientes: "Ingredientes",
+  clientes: "Clientes",
+  entregadores: "Entregadores",
+  acerto_entregadores: "Acerto Entregadores",
+  financeiro: "Financeiro",
+  integracoes: "Integrações",
+  usuarios: "Usuários",
+};
+
+const getPermissionLabel = (perm) => permissionLabels[perm] || perm;
 </script>
 
 <template>
@@ -131,14 +148,28 @@ const deleteUser = async (userId) => {
               <td class="p-4 font-medium text-slate-600 text-sm">
                 {{ user.role }}
               </td>
-              <td class="p-4 text-sm">
+              <td class="p-4 text-sm max-w-xs">
                 <span
-                  v-for="perm in user.permissions"
-                  :key="perm"
-                  class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-1 mb-1"
+                  v-if="user.role === 'ADMIN'"
+                  class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200"
                 >
-                  {{ perm }}
+                  ⚡ Acesso Total (Admin)
                 </span>
+                <template v-else>
+                  <span
+                    v-for="perm in user.permissions"
+                    :key="perm"
+                    class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 mr-1 mb-1"
+                  >
+                    {{ getPermissionLabel(perm) }}
+                  </span>
+                  <span
+                    v-if="!user.permissions || user.permissions.length === 0"
+                    class="text-xs text-slate-400 italic"
+                  >
+                    Nenhuma permissão atribuída
+                  </span>
+                </template>
               </td>
               <td class="p-4 text-right">
                 <div class="flex justify-end gap-2">
