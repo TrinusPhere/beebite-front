@@ -14,11 +14,13 @@ import {
   FileText, // Ícone NF-e
   MessageSquare,
   Eye,
+  Printer,
 } from "lucide-vue-next";
 import BaseButton from "@/components/BaseButton.vue";
 import ChatDrawer from "@/components/ChatDrawer.vue";
 import GeneralChatDrawer from "@/components/GeneralChatDrawer.vue";
 import OrderDetailsModal from "@/components/OrderDetailsModal.vue";
+import PrintOrderModal from "@/components/PrintOrderModal.vue";
 import { orderService } from "@/services/orderService";
 import { driverService } from "@/services/driverService";
 import { integrationService } from "@/services/integrationService";
@@ -29,6 +31,7 @@ import {
   normalizeOrderContext,
   contextLabel,
   isDeliveryOrder,
+  requiresDeliveryDriver,
 } from "@/utils/orderContext";
 
 const router = useRouter();
@@ -60,6 +63,15 @@ const openOrderDetails = async (order) => {
 const closeOrderDetails = () => {
   showOrderDetails.value = false;
   selectedOrderDetails.value = null;
+};
+
+const showPrintModal = ref(false);
+const orderToPrint = ref(null);
+
+const openPrintModal = (order) => {
+  openMenuId.value = null;
+  orderToPrint.value = order;
+  showPrintModal.value = true;
 };
 
 const fetchKanban = async () => {
@@ -225,7 +237,30 @@ const loadDrivers = async () => {
 };
 
 const openMotoboyModal = (orders) => {
-  ordersToAssign.value = orders;
+  // Garantir que apenas pedidos que necessitam de entregador abram o modal
+  const validOrders = (orders || []).filter((o) => {
+    let orderData = o;
+    if (!orderData.serviceType && !orderData.type) {
+      for (const col of columns.value || []) {
+        const found = col.orders?.find((item) => item.id === o.id);
+        if (found) {
+          orderData = found;
+          break;
+        }
+      }
+    }
+    return requiresDeliveryDriver(orderData);
+  });
+
+  if (validOrders.length === 0) {
+    notify({
+      type: "info",
+      message: "Pedidos de balcão, retirada ou salão não utilizam motoboy.",
+    });
+    return;
+  }
+
+  ordersToAssign.value = validOrders;
   selectedMotoboyId.value = null; // Resetar seleção
   showMotoboyModal.value = true;
 };
@@ -284,7 +319,7 @@ const startDrag = (event, order, colIndex) => {
   event.dataTransfer.setData("text/plain", order.id); // Necessário para Firefox
 };
 
-const onDrop = (event, toColIndex) => {
+const onDrop = async (event, toColIndex) => {
   event.preventDefault();
   isDragging.value = false;
 
@@ -300,27 +335,33 @@ const onDrop = (event, toColIndex) => {
     return;
   }
 
-  // Remover o pedido da coluna de origem
-  const fromColumn = columns[fromColIndex];
-  fromColumn.orders = fromColumn.orders.filter((o) => o.id !== order.id);
+  const toColumn = columns.value[toColIndex];
+  if (!toColumn) return;
 
-  // Adicionar o pedido à nova coluna
-  const toColumn = columns[toColIndex];
-  toColumn.orders.unshift(order); // Adiciona no início da nova coluna
-
-  // Lógica de sincronização iFood
-  if (order.platform === "ifood" && order.externalOrderId) {
-    updateIfoodStatus(order, fromColumn.id, toColumn.id);
+  // Se estiver tentando mover para EM_ROTA
+  if (toColumn.id === "EM_ROTA" || toColumn.id === "rota") {
+    if (!requiresDeliveryDriver(order)) {
+      alert("Pedidos de balcão, retirada ou salão não vão para rota de entrega.");
+      draggedOrder.value = null;
+      draggedFromColumnIndex.value = null;
+      return;
+    }
+    if (!order.driverName) {
+      pendingAdvanceOrderId.value = order.id;
+      openMotoboyModal([{ id: order.id, colIndex: fromColIndex }]);
+      draggedOrder.value = null;
+      draggedFromColumnIndex.value = null;
+      return;
+    }
   }
 
-  // Lógica de avaliação ao finalizar
-  if (toColumn.id === "finalizado") {
-    const driverName = getDriverName(order) || "Não aplicável (Balcão)";
-    setTimeout(() => {
-      alert(
-        `Mensagem automática enviada via WhatsApp para o cliente ${order.customerName}${order.customerPhone ? ` (${order.customerPhone})` : ""} solicitando avaliação do pedido ${order.id} e do entregador: ${driverName}.`,
-      );
-    }, 500);
+  try {
+    await orderService.moveToColumn(order.id, toColumn.id);
+    await fetchKanban();
+  } catch (error) {
+    console.error("Erro ao mover pedido via drag-and-drop:", error);
+    alert(error.response?.data?.message || "Não foi possível mover o pedido.");
+    await fetchKanban();
   }
 
   draggedOrder.value = null;
@@ -412,7 +453,7 @@ const startPollingIfoodOrders = () => {
           externalOrderId: `IFD-EXT-${Math.floor(Math.random() * 1000)}`,
         };
 
-        const preparingColumn = columns.find((col) => col.id === "preparando");
+        const preparingColumn = columns.value?.find((col) => col.id === "PREPARO" || col.id === "preparando");
         if (preparingColumn) {
           preparingColumn.orders.unshift(newOrder);
           alert(`Novo pedido iFood recebido: ${newOrder.id}!`);
@@ -440,36 +481,36 @@ onUnmounted(() => {
 });
 
 const moveOrder = (orderId, currentColumnIndex) => {
-  const rotaColumnIndex = columns.findIndex((col) => col.id === "rota");
-  const finalizadoColumnIndex = columns.findIndex(
-    (col) => col.id === "finalizado",
+  const rotaColumnIndex = columns.value.findIndex((col) => col.id === "EM_ROTA" || col.id === "rota");
+  const finalizadoColumnIndex = columns.value.findIndex(
+    (col) => col.id === "FINALIZADO" || col.id === "finalizado",
   );
 
   if (currentColumnIndex + 1 === rotaColumnIndex) {
     // Movendo para 'Em Rota de Entrega'
-    const originalCol = columns[currentColumnIndex];
+    const originalCol = columns.value[currentColumnIndex];
     const order = originalCol.orders.find((o) => o.id === orderId);
-    if (order && order.type === "delivery") {
+    if (order && requiresDeliveryDriver(order)) {
       openMotoboyModal([{ id: order.id, colIndex: currentColumnIndex }]);
-    } else if (order && order.type === "balcao") {
-      // Se for balcão, move diretamente sem motoboy
+    } else if (order) {
+      // Se for balcão, retirada ou salão, move diretamente sem motoboy
       const orderIndex = originalCol.orders.findIndex((o) => o.id === orderId);
       if (orderIndex !== -1) {
         const [movedOrder] = originalCol.orders.splice(orderIndex, 1);
-        columns[currentColumnIndex + 1].orders.unshift(movedOrder);
+        columns.value[currentColumnIndex + 1].orders.unshift(movedOrder);
       }
     }
-  } else if (currentColumnIndex < columns.length - 1) {
-    const originalCol = columns[currentColumnIndex];
+  } else if (currentColumnIndex < columns.value.length - 1) {
+    const originalCol = columns.value[currentColumnIndex];
     const orderIndex = originalCol.orders.findIndex((o) => o.id === orderId);
     if (orderIndex !== -1) {
       const [order] = originalCol.orders.splice(orderIndex, 1);
       const targetColIndex = currentColumnIndex + 1;
-      columns[targetColIndex].orders.unshift(order);
+      columns.value[targetColIndex].orders.unshift(order);
 
       // Se moveu para finalizado, disparar solicitação de avaliação
       if (targetColIndex === finalizadoColumnIndex) {
-        const driverName = getDriverName(order) || "Não aplicável (Balcão)";
+        const driverName = getDriverName(order) || "Não aplicável (Balcão/Retirada)";
         // Simulação do envio de mensagem de avaliação
         setTimeout(() => {
           alert(
@@ -494,10 +535,11 @@ const advanceOrder = async (orderId) => {
     }
   }
 
-  // Se é DELIVERY e está em PREPARO → abrir modal de motoboy antes
+  // Apenas pedidos para entrega a domicílio (com motoboy) em PREPARO abrem o modal
+  // Pedidos de balcão, retirada ou salão pulam a rota e vão direto para FINALIZADO
   if (
     orderData &&
-    isDeliveryOrder(orderData) &&
+    requiresDeliveryDriver(orderData) &&
     columnId === "PREPARO" &&
     !orderData.driverName
   ) {
@@ -540,55 +582,50 @@ const processBatchMove = async (orders, action) => {
   }
 };
 
-const moveSelectedTo = (targetColIndex) => {
-  const rotaColumnIndex = columns.findIndex((col) => col.id === "rota");
-  if (targetColIndex === rotaColumnIndex) {
+const moveSelectedTo = async (targetColIndex) => {
+  const targetCol = columns.value[targetColIndex];
+  if (!targetCol) return;
+
+  const isRota = targetCol.id === "EM_ROTA" || targetCol.id === "rota";
+  if (isRota) {
     // Movendo para 'Em Rota de Entrega'
     const deliveryOrdersToMove = selectedOrders.value.filter((order) =>
-      isDeliveryOrder(order),
+      requiresDeliveryDriver(order),
     );
-    const salaoOrdersToMove = selectedOrders.value.filter(
-      (order) => !isDeliveryOrder(order),
+    const nonDeliveryOrdersToMove = selectedOrders.value.filter(
+      (order) => !requiresDeliveryDriver(order),
     );
 
-    if (deliveryOrdersToMove.length > 0) {
-      openMotoboyModal(deliveryOrdersToMove);
-    } else if (salaoOrdersToMove.length > 0) {
+    if (nonDeliveryOrdersToMove.length > 0 && deliveryOrdersToMove.length === 0) {
       alert(
-        "Pedidos da operação SALÃO não podem ser enviados para a coluna de rota de entrega.",
+        "Pedidos de balcão, retirada ou salão não podem ser enviados para a rota de entrega.",
       );
       return;
-      salaoOrdersToMove.forEach((item) => {
-        const originalColIdx = columns.findIndex(
-          (_, idx) => idx === item.colIndex,
+    }
+
+    if (deliveryOrdersToMove.length > 0) {
+      if (nonDeliveryOrdersToMove.length > 0) {
+        alert(
+          "Apenas pedidos para entrega a domicílio serão enviados para a rota. Pedidos de retirada/balcão foram ignorados.",
         );
-        const col = columns[originalColIdx];
-        const orderIdx = col.orders.findIndex((o) => o.id === item.id);
-        if (orderIdx !== -1) {
-          const [order] = col.orders.splice(orderIdx, 1);
-          order.selected = false;
-          columns[targetColIndex].orders.unshift(order);
-        }
-      });
-      // Limpar seleção após mover
-      selectedOrders.value.forEach((order) => (order.selected = false));
+      }
+      openMotoboyModal(deliveryOrdersToMove);
     } else {
       alert('Nenhum pedido selecionado para mover para "Em Rota de Entrega".');
     }
   } else {
-    // Lógica existente para mover para outras colunas
-    selectedOrders.value.forEach((item) => {
-      const originalColIdx = columns.findIndex(
-        (_, idx) => idx === item.colIndex,
+    // Mover para outras colunas no backend
+    try {
+      await orderService.batchMove(
+        selectedOrders.value.map((o) => o.id),
+        targetCol.id,
       );
-      const col = columns[originalColIdx];
-      const orderIdx = col.orders.findIndex((o) => o.id === item.id);
-      if (orderIdx !== -1) {
-        const [order] = col.orders.splice(orderIdx, 1);
-        order.selected = false;
-        columns[targetColIndex].orders.unshift(order);
-      }
-    });
+      await fetchKanban();
+      selectedOrders.value.forEach((o) => (o.selected = false));
+    } catch (err) {
+      console.error("Erro ao mover em lote:", err);
+      alert(err.response?.data?.message || "Erro ao mover pedidos em lote.");
+    }
   }
 };
 
@@ -820,6 +857,12 @@ const emitirNFe = (order) => {
                           <Eye :size="14" class="text-orange-500" /> Detalhes do pedido
                         </button>
                         <button
+                          @click.stop="openPrintModal(order)"
+                          class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                        >
+                          <Printer :size="14" class="text-orange-500" /> Imprimir comanda
+                        </button>
+                        <button
                           v-if="['ANALISE', 'PREPARO'].includes(order.status)"
                           @click.stop="editOrder(order.id)"
                           class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
@@ -1029,6 +1072,12 @@ const emitirNFe = (order) => {
       :order="selectedOrderDetails"
       :loading="loadingOrderDetails"
       @close="closeOrderDetails"
+    />
+
+    <PrintOrderModal
+      :show="showPrintModal"
+      :order="orderToPrint"
+      @close="showPrintModal = false"
     />
   </div>
 </template>

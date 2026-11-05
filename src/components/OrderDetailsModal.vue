@@ -1,9 +1,13 @@
 <script setup>
-import { Bike, MapPin, Phone, ReceiptText, User, X } from "lucide-vue-next";
+import { ref } from "vue";
+import { Bike, MapPin, Phone, ReceiptText, User, X, Printer } from "lucide-vue-next";
 import { contextLabel, normalizeOrderContext } from "@/utils/orderContext";
+import PrintOrderModal from "@/components/PrintOrderModal.vue";
 
-defineProps({ show: Boolean, order: Object, loading: Boolean });
+const props = defineProps({ show: Boolean, order: Object, loading: Boolean });
 defineEmits(["close"]);
+
+const showPrintModal = ref(false);
 const money = (value) =>
   Number(value || 0).toLocaleString("pt-BR", {
     style: "currency",
@@ -28,9 +32,20 @@ const dateTime = (value) =>
             <p class="text-xs font-black uppercase tracking-wider text-orange-500">Detalhes do pedido</p>
             <h2 class="text-xl font-black text-slate-800">{{ order?.displayId || order?.id || 'Carregando...' }}</h2>
           </div>
-          <button class="p-2 rounded-xl hover:bg-slate-100 text-slate-500" @click="$emit('close')">
-            <X :size="22" />
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              v-if="order"
+              type="button"
+              @click="showPrintModal = true"
+              class="flex items-center gap-1.5 px-3.5 py-2 bg-orange-50 text-orange-600 rounded-xl text-xs font-bold hover:bg-orange-100 transition shadow-sm border border-orange-200"
+            >
+              <Printer :size="15" />
+              <span>Imprimir Comanda</span>
+            </button>
+            <button class="p-2 rounded-xl hover:bg-slate-100 text-slate-500" @click="$emit('close')">
+              <X :size="22" />
+            </button>
+          </div>
         </header>
 
         <div v-if="loading" class="p-12 text-center text-slate-400">Carregando informações...</div>
@@ -82,5 +97,10 @@ const dateTime = (value) =>
         </div>
       </section>
     </div>
+    <PrintOrderModal
+      :show="showPrintModal"
+      :order="order"
+      @close="showPrintModal = false"
+    />
   </Teleport>
 </template>

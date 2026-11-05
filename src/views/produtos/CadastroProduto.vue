@@ -268,19 +268,21 @@ const handleSubmit = async () => {
   try {
     const payload = { ...form };
 
+    // Sanitiza e mapeia os itens da ficha técnica
+    payload.technicalSheet = (payload.technicalSheet || []).map((i) => ({
+      ingredientId: i.ingredientId || i.id,
+      quantity: Number(i.quantity) || 1,
+    }));
+
     if (payload.productType === "RESALE") {
-      payload.trackStock = true;
-      payload.stock = Math.max(0, Math.trunc(Number(payload.stock) || 0));
-      payload.technicalSheet = [];
       payload.removableItemIds = [];
+      // Se não vincular ingredientes na ficha técnica, o controle pode ser feito no estoque avulso do produto
+      payload.trackStock = payload.technicalSheet.length === 0;
+      payload.stock = Math.max(0, Math.trunc(Number(payload.stock) || 0));
     } else {
       payload.trackStock = false;
+      payload.stock = 0;
     }
-
-    payload.technicalSheet = payload.technicalSheet.map((i) => ({
-      ingredientId: i.ingredientId || i.id,
-      quantity: i.quantity,
-    }));
 
     if (isEditing.value) {
       await productService.update(form.id, payload);
@@ -875,20 +877,28 @@ const handleNewIngredientCost = (event) => {
                 ><input v-model="form.active" type="checkbox" /> Produto
                 ativo</label
               >
-              <div v-if="form.productType === 'RESALE'" class="space-y-1">
-                <label class="text-xs font-bold text-slate-700"
-                  >Estoque atual (unidades)</label
-                >
-                <input
-                  v-model.number="form.stock"
-                  type="number"
-                  min="0"
-                  step="1"
-                  class="w-full bg-white border border-slate-200 p-3 rounded-xl font-bold"
-                />
-                <p class="text-[11px] text-slate-400">
-                  O estoque é debitado automaticamente a cada venda.
-                </p>
+              <div v-if="form.productType === 'RESALE'" class="space-y-2">
+                <div v-if="form.technicalSheet && form.technicalSheet.length > 0" class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
+                  <span class="font-bold flex items-center gap-1">✓ Estoque vinculado ao Ingrediente</span>
+                  <p class="mt-0.5 text-emerald-700">
+                    O estoque será debitado automaticamente do(s) ingrediente(s) vinculado(s) na Ficha Técnica abaixo a cada venda.
+                  </p>
+                </div>
+                <div v-else class="space-y-1">
+                  <label class="text-xs font-bold text-slate-700"
+                    >Estoque atual (unidades avulsas)</label
+                  >
+                  <input
+                    v-model.number="form.stock"
+                    type="number"
+                    min="0"
+                    step="1"
+                    class="w-full bg-white border border-slate-200 p-3 rounded-xl font-bold"
+                  />
+                  <p class="text-[11px] text-slate-400">
+                    Vincule o ingrediente na Ficha Técnica abaixo para controle centralizado de estoque.
+                  </p>
+                </div>
               </div>
               <label class="flex items-center gap-2 text-sm font-bold"
                 ><input v-model="form.availablePdv" type="checkbox" />
@@ -970,16 +980,23 @@ const handleNewIngredientCost = (event) => {
           </div>
         </div>
 
-        <template v-if="form.productType === 'PRODUCED'">
-        <!-- Ficha Técnica -->
+        <!-- Ficha Técnica (Composição / Ingredientes Vinculados) -->
         <div
           class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6"
         >
           <div class="flex items-center justify-between">
-            <div
-              class="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest"
-            >
-              <UtensilsCrossed :size="16" /> Composição
+            <div>
+              <div
+                class="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest"
+              >
+                <UtensilsCrossed :size="16" />
+                {{ form.productType === 'RESALE' ? 'Ingrediente Vinculado / Ficha Técnica' : 'Composição / Ficha Técnica' }}
+              </div>
+              <p class="text-xs text-slate-500 mt-1">
+                {{ form.productType === 'RESALE'
+                  ? 'Vincule o item cadastrado em Ingredientes para debitar automaticamente do estoque na venda deste produto de revenda.'
+                  : 'Adicione os ingredientes que compõem este produto para controle de estoque e cálculo de custo.' }}
+              </p>
             </div>
             <BaseButton
               type="button"
@@ -987,14 +1004,15 @@ const handleNewIngredientCost = (event) => {
               size="sm"
               @click="openIngredientModal"
             >
-              <Plus :size="16" /> Criar Ficha Técnica
+              <Plus :size="16" />
+              {{ form.technicalSheet.length > 0 ? 'Editar Ficha Técnica' : (form.productType === 'RESALE' ? 'Vincular Ingrediente' : 'Criar Ficha Técnica') }}
             </BaseButton>
           </div>
 
           <div v-if="form.technicalSheet.length > 0" class="space-y-3">
             <div
               v-for="(item, index) in form.technicalSheet"
-              :key="item.id"
+              :key="item.id || item.ingredientId || index"
               class="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100"
             >
               <div class="flex-1 font-bold text-slate-800 text-sm">
@@ -1004,14 +1022,18 @@ const handleNewIngredientCost = (event) => {
                 <input
                   v-model="item.quantity"
                   type="number"
-                  class="w-16 p-2 text-center text-sm font-black bg-white border border-slate-200 rounded-lg"
+                  min="0.001"
+                  step="any"
+                  class="w-20 p-2 text-center text-sm font-black bg-white border border-slate-200 rounded-lg"
                 />
                 <span class="text-[10px] font-black text-slate-400 uppercase">{{
                   item.unit
                 }}</span>
                 <button
+                  type="button"
                   @click="removeIngredient(index)"
                   class="p-2 text-slate-300 hover:text-red-500"
+                  title="Remover da ficha técnica"
                 >
                   <Trash2 :size="18" />
                 </button>
@@ -1020,14 +1042,17 @@ const handleNewIngredientCost = (event) => {
           </div>
           <div
             v-else
-            class="text-slate-400 text-sm font-medium text-center py-4"
+            class="text-slate-400 text-sm font-medium text-center py-6 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50"
           >
-            Nenhum ingrediente adicionado à ficha técnica.
+            {{ form.productType === 'RESALE'
+              ? 'Nenhum ingrediente vinculado ainda. Clique no botão acima para vincular o item ao estoque.'
+              : 'Nenhum ingrediente adicionado à ficha técnica.' }}
           </div>
         </div>
 
-        <!-- Ingredientes Removíveis -->
+        <!-- Ingredientes Removíveis (apenas para produtos produzidos) -->
         <div
+          v-if="form.productType === 'PRODUCED'"
           class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6"
         >
           <div
@@ -1072,7 +1097,6 @@ const handleNewIngredientCost = (event) => {
             Adicione itens na ficha técnica primeiro.
           </div>
         </div>
-        </template>
       </div>
     </div>
 

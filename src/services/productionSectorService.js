@@ -5,3 +5,5 @@ export const productionSectorService = {
   save: async (data) => (await api.post("/production-sectors", data)).data,
   remove: async (id) => (await api.delete(`/production-sectors/${id}`)).data,
 };
+
+export default productionSectorService;

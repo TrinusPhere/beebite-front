@@ -28,17 +28,70 @@ const currentUserForm = reactive({
   permissions: [],
 });
 
-const allPermissions = [
-  "dashboard",
-  "pedidos",
-  "clientes",
-  "ingredientes",
-  "produtos",
-  "entregadores",
-  "financeiro",
-  "acerto_entregadores",
-  "usuarios",
+const permissionList = [
+  {
+    value: "dashboard",
+    label: "Dashboard",
+    description: "Visualização de métricas e painéis de desempenho",
+  },
+  {
+    value: "caixa",
+    label: "Caixa PDV",
+    description: "Abertura, fechamento, sangrias e conferência de caixa",
+  },
+  {
+    value: "pedidos",
+    label: "Pedidos",
+    description: "Gestão do Kanban de pedidos, chat e status operacional",
+  },
+  {
+    value: "kds",
+    label: "KDS (Cozinha)",
+    description: "Telas de preparo touch e configurações de estações KDS",
+  },
+  {
+    value: "produtos",
+    label: "Produtos & Cardápio",
+    description: "Cadastro de produtos, categorias, adicionais e impressoras",
+  },
+  {
+    value: "ingredientes",
+    label: "Ingredientes & Estoque",
+    description: "Insumos, fichas técnicas e movimentações de estoque",
+  },
+  {
+    value: "clientes",
+    label: "Clientes",
+    description: "Cadastro e histórico de compras de clientes",
+  },
+  {
+    value: "entregadores",
+    label: "Entregadores",
+    description: "Gestão e cadastro de motoboys para entrega",
+  },
+  {
+    value: "acerto_entregadores",
+    label: "Acerto de Entregadores",
+    description: "Fechamento de diárias e acerto financeiro de entregadores",
+  },
+  {
+    value: "financeiro",
+    label: "Financeiro & CMV",
+    description: "Relatórios de vendas, DRE, fluxo e inteligência financeira",
+  },
+  {
+    value: "integracoes",
+    label: "Integrações",
+    description: "Conexão com iFood, WhatsApp e cardápio digital",
+  },
+  {
+    value: "usuarios",
+    label: "Gestão de Usuários",
+    description: "Criação, edição e controle de permissões de acesso",
+  },
 ];
+
+const allPermissions = permissionList.map((p) => p.value);
 
 const selectAll = ref(false);
 
@@ -198,41 +251,48 @@ const cancel = () => {
           </div>
         </div>
 
-        <div class="space-y-2">
-          <div class="flex items-center mb-3">
-            <input
-              type="checkbox"
-              id="selectAllPermissions"
-              v-model="selectAll"
-              @change="toggleSelectAll"
-              class="h-4 w-4 text-orange-600 focus:ring-orange-500 border-slate-300 rounded"
-            />
-            <label
-              for="selectAllPermissions"
-              class="ml-2 text-sm text-slate-700 font-bold"
-              >Permissões</label
-            >
+        <div class="space-y-4 pt-2">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
+            <div>
+              <h3 class="text-sm font-bold text-slate-800">Módulos e Permissões de Acesso</h3>
+              <p class="text-xs text-slate-400">Selecione quais áreas do BiteFlow este usuário terá permissão para acessar.</p>
+            </div>
+            <label class="flex items-center gap-2 cursor-pointer bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 transition text-xs font-bold text-slate-700 self-start sm:self-auto">
+              <input
+                type="checkbox"
+                id="selectAllPermissions"
+                v-model="selectAll"
+                @change="toggleSelectAll"
+                class="h-4 w-4 text-orange-600 focus:ring-orange-500 border-slate-300 rounded"
+              />
+              Marcar Todas
+            </label>
           </div>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div
-              v-for="perm in allPermissions"
-              :key="perm"
-              class="flex items-center"
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <label
+              v-for="perm in permissionList"
+              :key="perm.value"
+              :class="[
+                'flex items-start gap-3 p-3.5 border rounded-2xl cursor-pointer transition-all',
+                currentUserForm.permissions.includes(perm.value)
+                  ? 'border-orange-500 bg-orange-50/60 shadow-xs ring-1 ring-orange-500/30'
+                  : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/50'
+              ]"
             >
               <input
                 type="checkbox"
-                :id="`perm-${perm}`"
-                :value="perm"
+                :id="`perm-${perm.value}`"
+                :value="perm.value"
                 v-model="currentUserForm.permissions"
                 @change="updateSelectAllCheckbox"
-                class="h-4 w-4 text-orange-600 focus:ring-orange-500 border-slate-300 rounded"
+                class="mt-1 h-4 w-4 text-orange-600 focus:ring-orange-500 border-slate-300 rounded"
               />
-              <label
-                :for="`perm-${perm}`"
-                class="ml-2 text-sm text-slate-700 capitalize"
-                >{{ perm.replace("_", " ") }}</label
-              >
-            </div>
+              <div class="flex flex-col select-none">
+                <span class="text-sm font-bold text-slate-800">{{ perm.label }}</span>
+                <span class="text-xs text-slate-500 leading-tight mt-0.5">{{ perm.description }}</span>
+              </div>
+            </label>
           </div>
         </div>
 

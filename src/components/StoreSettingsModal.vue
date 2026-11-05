@@ -68,11 +68,12 @@ const save = async () => {
     });
     
     await storeService.updateStore(storeInfo.value);
+    emit("close");
   } catch (e) {
-    console.error(e);
+    console.error("Erro ao salvar loja:", e);
+    alert(e.response?.data?.message || "Erro ao salvar configurações da loja.");
   } finally {
     saving.value = false;
-    emit("close");
   }
 };
 
