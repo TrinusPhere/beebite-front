@@ -14,6 +14,7 @@ import {
   Plus,
   CheckCircle,
   CircleAlert,
+  Layers,
 } from "lucide-vue-next";
 import BaseButton from "@/components/BaseButton.vue";
 import BaseModal from "@/components/BaseModal.vue";
@@ -38,6 +39,32 @@ const availableIngredients = ref([]);
 const modifierGroups = ref([]);
 const availableCategories = ref([]);
 const productionSectors = ref([]);
+const availableProducts = ref([]);
+const comboComponents = ref([]);
+
+const addComboComponent = () => {
+  comboComponents.value.push({
+    componentProductId: "",
+    quantity: 1,
+  });
+};
+
+const removeComboComponent = (index) => {
+  comboComponents.value.splice(index, 1);
+};
+
+const getSectorName = (sectorId) => {
+  if (!sectorId) return "";
+  const sec = productionSectors.value.find((s) => s.id === sectorId);
+  return sec ? sec.name : "";
+};
+
+const isCombo = computed(() => {
+  if (form.productType === "COMBO") return true;
+  if (comboComponents.value.length > 0) return true;
+  const cat = availableCategories.value.find((c) => c.id === form.categoryId);
+  return Boolean(cat && cat.name && cat.name.toLowerCase().includes("combo"));
+});
 const isCreatingNewCategory = ref(false);
 const newCategoryName = ref("");
 
@@ -131,6 +158,13 @@ onMounted(async () => {
     availableCategories.value = await categoryService.getCategories();
     productionSectors.value = await productionSectorService.getAll();
 
+    try {
+      const prods = await productService.getAll(null, 0, 100);
+      availableProducts.value = prods?.content || (Array.isArray(prods) ? prods : []);
+    } catch (e) {
+      console.error("Erro ao carregar lista de produtos:", e);
+    }
+
     if (
       !route.params.id &&
       !route.query.cloneId &&
@@ -153,6 +187,17 @@ onMounted(async () => {
             (item) => item.ingredientId,
           );
         }
+        try {
+          const comps = await productService.getComponents(itemToEdit.id);
+          if (comps && comps.length > 0) {
+            comboComponents.value = comps.map((c) => ({
+              componentProductId: c.componentProductId,
+              quantity: c.quantity,
+            }));
+          }
+        } catch (e) {
+          // sem componentes vinculados
+        }
       }
     } else if (route.query.cloneId) {
       isEditing.value = false;
@@ -163,6 +208,17 @@ onMounted(async () => {
           form.removableItemIds = itemToClone.removableItems.map(
             (item) => item.ingredientId,
           );
+        }
+        try {
+          const comps = await productService.getComponents(itemToClone.id);
+          if (comps && comps.length > 0) {
+            comboComponents.value = comps.map((c) => ({
+              componentProductId: c.componentProductId,
+              quantity: c.quantity,
+            }));
+          }
+        } catch (e) {
+          // sem componentes vinculados para clone
         }
         form.id = null; // Ensure it's treated as a new product
         form.name = `${itemToClone.name} (Cópia)`;
@@ -284,6 +340,7 @@ const handleSubmit = async () => {
       payload.stock = 0;
     }
 
+    let savedProductId = form.id;
     if (isEditing.value) {
       await productService.update(form.id, payload);
 
@@ -292,11 +349,22 @@ const handleSubmit = async () => {
       modalMessage.value = "Produto atualizado com sucesso.";
     } else {
       delete payload.id;
-      await productService.create(payload);
+      const created = await productService.create(payload);
+      savedProductId = created?.id;
 
       modalType.value = "success";
       modalTitle.value = "Produto cadastrado!";
       modalMessage.value = "Produto cadastrado com sucesso.";
+    }
+
+    if ((payload.productType === "COMBO" || comboComponents.value.length > 0) && savedProductId) {
+      const componentsPayload = comboComponents.value
+        .filter((c) => c.componentProductId && Number(c.quantity) > 0)
+        .map((c) => ({
+          componentProductId: c.componentProductId,
+          quantity: Number(c.quantity),
+        }));
+      await productService.manageComponents(savedProductId, componentsPayload);
     }
 
     redirectAfterClose.value = true;
@@ -837,6 +905,7 @@ const handleNewIngredientCost = (event) => {
               >
                 <option value="PRODUCED">Produzido / ficha técnica</option>
                 <option value="RESALE">Revenda / estoque próprio</option>
+                <option value="COMBO">Combo (Composição de outros produtos)</option>
               </select>
             </div>
             <div class="space-y-1">
@@ -980,7 +1049,89 @@ const handleNewIngredientCost = (event) => {
           </div>
         </div>
 
-        <!-- Ficha Técnica (Composição / Ingredientes Vinculados) -->
+        <!-- Componentes do Combo para KDS -->
+        <div
+          v-if="isCombo"
+          class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6"
+        >
+          <div class="flex items-center justify-between">
+            <div>
+              <div
+                class="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest"
+              >
+                <Layers :size="16" />
+                Componentes do Combo
+              </div>
+              <p class="text-xs text-slate-500 mt-1">
+                Selecione os produtos que fazem parte deste combo. Ao despachar para o KDS, cada componente será direcionado para sua estação de preparo (ex: hambúrguer para a Chapa, batata para Frituras).
+              </p>
+            </div>
+            <BaseButton
+              type="button"
+              variant="secondary"
+              size="sm"
+              @click="addComboComponent"
+            >
+              <Plus :size="16" />
+              Adicionar Item ao Combo
+            </BaseButton>
+          </div>
+
+          <div v-if="comboComponents.length > 0" class="space-y-3">
+            <div
+              v-for="(comp, index) in comboComponents"
+              :key="index"
+              class="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100"
+            >
+              <div class="flex-1">
+                <label class="text-[11px] font-bold text-slate-600 block mb-1">Produto Componente</label>
+                <select
+                  v-model="comp.componentProductId"
+                  class="w-full p-2.5 text-sm bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20"
+                >
+                  <option value="" disabled>Selecione um produto cadastrado...</option>
+                  <option
+                    v-for="p in availableProducts.filter((p) => p.id !== form.id)"
+                    :key="p.id"
+                    :value="p.id"
+                  >
+                    {{ p.name }} ({{ getSectorName(p.productionSectorId) || 'Sem setor' }})
+                  </option>
+                </select>
+              </div>
+
+              <div class="w-28">
+                <label class="text-[11px] font-bold text-slate-600 block mb-1">Quantidade</label>
+                <input
+                  v-model.number="comp.quantity"
+                  type="number"
+                  min="1"
+                  class="w-full p-2.5 text-center text-sm font-bold bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-500/20"
+                />
+              </div>
+
+              <div class="flex items-end">
+                <button
+                  type="button"
+                  @click="removeComboComponent(index)"
+                  class="p-2.5 text-slate-400 hover:text-red-500 rounded-xl transition"
+                  title="Remover este componente do combo"
+                >
+                  <Trash2 :size="18" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-else
+            class="text-slate-400 text-sm font-medium text-center py-6 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50"
+          >
+            Nenhum componente vinculado a este combo ainda. Clique no botão acima para adicionar produtos.
+          </div>
+        </div>
+
+        <!-- Ficha Técnica (Composição / Ingredientes Vinculados para Estoque) -->
         <div
           class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6"
         >

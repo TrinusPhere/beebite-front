@@ -140,7 +140,9 @@
           <div class="flex items-center gap-2 text-[11px] text-slate-400 mt-2">
             <span>Dinheiro: R$ {{ formatMoney(summary?.cashSalesAmount) }}</span>
             <span>•</span>
-            <span>Cartão/PIX: R$ {{ formatMoney(summary?.cardSalesAmount + summary?.pixSalesAmount) }}</span>
+            <span>Cartão: R$ {{ formatMoney(summary?.cardSalesAmount) }}</span>
+            <span>•</span>
+            <span>PIX: R$ {{ formatMoney(summary?.pixSalesAmount) }}</span>
           </div>
         </div>
 
@@ -256,6 +258,82 @@
                 </td>
                 <td class="px-4 py-3 text-right font-mono font-bold text-slate-900 dark:text-white">
                   R$ {{ formatMoney(d.totalCollected) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Seção: Pagamentos e Vendas Recebidas na Sessão -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div>
+            <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              💳 Vendas e Pagamentos Recebidos no Turno
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Recebimentos de pedidos finalizados integrados diretamente com este caixa.
+            </p>
+          </div>
+          <span class="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-full font-bold">
+            {{ summary?.payments?.length || 0 }} pagamentos
+          </span>
+        </div>
+
+        <div v-if="!summary?.payments || summary.payments.length === 0" class="py-8 text-center text-slate-400 text-sm">
+          Nenhum pagamento registrado nesta sessão até o momento.
+        </div>
+
+        <div v-else class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+            <thead class="text-xs uppercase bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400">
+              <tr>
+                <th class="px-4 py-3 rounded-l-lg">Referência / Pedido</th>
+                <th class="px-4 py-3 text-center">Horário</th>
+                <th class="px-4 py-3 text-center">Forma</th>
+                <th class="px-4 py-3 text-center">Recebido Por</th>
+                <th class="px-4 py-3 text-center">Status</th>
+                <th class="px-4 py-3 rounded-r-lg text-right font-bold">Valor</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+              <tr v-for="p in summary.payments" :key="p.id" class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                <td class="px-4 py-3 font-bold text-slate-900 dark:text-white">
+                  {{ p.notes || ('Pedido #' + (p.orderId ? p.orderId.substring(0, 8) : '')) }}
+                </td>
+                <td class="px-4 py-3 text-center text-xs text-slate-400">
+                  {{ formatTime(p.paidAt || p.createdAt) }}
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <span
+                    :class="[
+                      'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase',
+                      p.method === 'DINHEIRO' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' :
+                      p.method === 'PIX' ? 'bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400' :
+                      'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400'
+                    ]"
+                  >
+                    {{ p.method }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-center text-xs">
+                  <span class="inline-flex items-center gap-1 font-semibold text-slate-600 dark:text-slate-300">
+                    {{ p.collectedBy === 'ENTREGADOR' ? '🛵 Entregador' : '🏪 Caixa' }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <span
+                    :class="[
+                      'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase',
+                      p.status === 'CONFIRMED' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+                    ]"
+                  >
+                    {{ p.status === 'CONFIRMED' ? '✓ Confirmado' : '✕ Cancelado' }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-right font-mono font-bold text-slate-900 dark:text-white">
+                  R$ {{ formatMoney(p.amount) }}
                 </td>
               </tr>
             </tbody>

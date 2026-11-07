@@ -18,4 +18,7 @@ export const productService = {
   updateAvailability: async (id, data) =>
     (await api.put(`/products/${id}/availability`, data)).data,
   getCategories: async () => (await api.get("/products/categories")).data,
+  getComponents: async (id) => (await api.get(`/products/${id}/components`)).data,
+  manageComponents: async (id, components) =>
+    (await api.put(`/products/${id}/components`, components)).data,
 };
