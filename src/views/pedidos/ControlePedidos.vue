@@ -15,6 +15,8 @@ import {
   MessageSquare,
   Eye,
   Printer,
+  CheckCircle2,
+  XCircle,
 } from "lucide-vue-next";
 import BaseButton from "@/components/BaseButton.vue";
 import ChatDrawer from "@/components/ChatDrawer.vue";
@@ -25,6 +27,7 @@ import { orderService } from "@/services/orderService";
 import { driverService } from "@/services/driverService";
 import { integrationService } from "@/services/integrationService";
 import { chatService } from "@/services/chatService";
+import cashService from "@/services/cashService";
 import { confirmAction, notify } from "@/services/notificationService";
 import {
   OPERATIONS,
@@ -38,6 +41,15 @@ const router = useRouter();
 
 const activeOperations = ref([OPERATIONS.SALAO, OPERATIONS.DELIVERY]);
 const openMenuId = ref(null);
+const currentSession = ref(null);
+
+const checkCashSession = async () => {
+  try {
+    currentSession.value = await cashService.getCurrentSession();
+  } catch {
+    currentSession.value = null;
+  }
+};
 
 const columns = ref([]);
 const showOrderDetails = ref(false);
@@ -87,11 +99,13 @@ let kanbanInterval = null;
 
 onMounted(() => {
   fetchKanban();
+  checkCashSession();
   loadDrivers();
   loadChatContext();
   
   kanbanInterval = setInterval(() => {
     fetchKanban();
+    checkCashSession();
   }, 10000);
 });
 
@@ -110,6 +124,24 @@ const formatTime = (isoString) => {
   } catch {
     return "--:--";
   }
+};
+
+const getOrderItems = (summary) => {
+  if (!summary) return [];
+  if (summary.includes("\n")) {
+    return summary
+      .split("\n")
+      .map((s) => s.trim().replace(/^,\s*/, "").replace(/,\s*$/, ""))
+      .filter(Boolean);
+  }
+  let items = summary
+    .split(/,\s*(?=\d+x\s)/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (items.length === 1 && summary.includes(", ")) {
+    items = summary.split(", ").map((s) => s.trim()).filter(Boolean);
+  }
+  return items;
 };
 
 // --- Chat vinculado diretamente ao pedido ---
@@ -312,6 +344,10 @@ const draggedOrder = ref(null);
 const draggedFromColumnIndex = ref(null);
 
 const startDrag = (event, order, colIndex) => {
+  if (order.status === "CANCELADO") {
+    event.preventDefault();
+    return;
+  }
   isDragging.value = true;
   draggedOrder.value = order;
   draggedFromColumnIndex.value = colIndex;
@@ -418,67 +454,7 @@ const updateIfoodStatus = (order, fromColumnId, toColumnId) => {
   );
 };
 
-// --- Polling de Novos Pedidos iFood ---
-let pollingInterval = null;
-const isPolling = ref(false);
 
-const startPollingIfoodOrders = () => {
-  if (isPolling.value) return;
-
-  isPolling.value = true;
-  console.log("Iniciando polling de pedidos iFood...");
-
-  pollingInterval = setInterval(() => {
-    console.log("Verificando novos pedidos iFood (simulado)...");
-    // Simula uma chamada ao backend para buscar novos pedidos iFood
-    // Em um sistema real, seria um GET /api/ifood/new-orders
-    setTimeout(() => {
-      // Simula a chegada de um novo pedido iFood a cada 15 segundos
-      if (Math.random() < 0.3) {
-        // 30% de chance de um novo pedido
-        const newIfoodOrderId = `IFD-${Math.floor(Math.random() * 100000)}`;
-        const newOrder = {
-          id: newIfoodOrderId,
-          customer: `Cliente iFood ${Math.floor(Math.random() * 100)}`,
-          items: "1x X-Burger, 1x Refri",
-          time: new Date().toLocaleTimeString("pt-BR", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          total: `R$ ${(Math.random() * 50 + 20).toFixed(2)}`,
-          selected: false,
-          type: "delivery",
-          driver: null,
-          platform: "ifood",
-          externalOrderId: `IFD-EXT-${Math.floor(Math.random() * 1000)}`,
-        };
-
-        const preparingColumn = columns.value?.find((col) => col.id === "PREPARO" || col.id === "preparando");
-        if (preparingColumn) {
-          preparingColumn.orders.unshift(newOrder);
-          alert(`Novo pedido iFood recebido: ${newOrder.id}!`);
-        }
-      }
-    }, 1000); // Simula o tempo de resposta do backend
-  }, 15000); // Polling a cada 15 segundos (para demonstração)
-};
-
-const stopPollingIfoodOrders = () => {
-  if (pollingInterval) {
-    clearInterval(pollingInterval);
-    pollingInterval = null;
-  }
-  isPolling.value = false;
-  console.log("Polling de pedidos iFood parado.");
-};
-
-onMounted(() => {
-  startPollingIfoodOrders();
-});
-
-onUnmounted(() => {
-  stopPollingIfoodOrders();
-});
 
 const moveOrder = (orderId, currentColumnIndex) => {
   const rotaColumnIndex = columns.value.findIndex((col) => col.id === "EM_ROTA" || col.id === "rota");
@@ -672,13 +648,31 @@ const emitirNFe = (order) => {
       <div
         class="flex flex-col md:flex-row md:items-center justify-between gap-4"
       >
-        <div>
-          <h1 class="text-2xl font-black text-slate-800 tracking-tight">
-            Painel de Pedidos
-          </h1>
-          <p class="text-slate-500 text-sm font-medium">
-            Controle de produção e logística
-          </p>
+        <div class="flex items-center gap-4">
+          <div>
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight">
+              Painel de Pedidos
+            </h1>
+            <p class="text-slate-500 text-sm font-medium">
+              Controle de produção e logística
+            </p>
+          </div>
+          <div
+            v-if="currentSession"
+            class="flex items-center gap-2 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 px-3 py-1.5 rounded-xl text-xs font-bold"
+            title="Caixa aberto — exibindo pedidos do turno atual"
+          >
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Caixa Aberto</span>
+          </div>
+          <div
+            v-else
+            class="flex items-center gap-2 bg-amber-500/10 text-amber-600 border border-amber-500/20 px-3 py-1.5 rounded-xl text-xs font-bold"
+            title="Caixa encerrado — o kanban fica limpo até a abertura do próximo turno"
+          >
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+            <span>Caixa Fechado</span>
+          </div>
         </div>
 
         <div class="flex items-center gap-3">
@@ -756,7 +750,7 @@ const emitirNFe = (order) => {
       <div
         v-for="(column, colIndex) in filteredColumns"
         :key="column.id"
-        class="flex-shrink-0 w-84 flex flex-col gap-4"
+        class="flex-shrink-0 w-80 max-w-[20rem] flex flex-col gap-4"
       >
         <!-- Header da Coluna -->
         <div class="flex items-center justify-between px-2">
@@ -799,14 +793,22 @@ const emitirNFe = (order) => {
             <div
               v-for="order in column.orders"
               :key="order.id"
-              class="border p-3 rounded-2xl shadow-sm hover:shadow-md transition-all group relative overflow-visible flex flex-col gap-2"
+              class="w-full min-w-0 border p-3 rounded-2xl shadow-sm hover:shadow-md transition-all group relative overflow-visible flex flex-col gap-2 break-words"
               :class="[
-                column.bg,
+                order.status === 'CANCELADO'
+                  ? 'bg-rose-50/40 border-rose-300'
+                  : (order.status === 'FINALIZADO'
+                      ? 'bg-emerald-50/20 border-emerald-200'
+                      : column.bg),
                 order.selected
                   ? 'ring-2 ring-orange-500/5'
-                  : 'border-slate-200',
+                  : (order.status === 'CANCELADO'
+                      ? 'border-rose-300'
+                      : (order.status === 'FINALIZADO'
+                          ? 'border-emerald-200'
+                          : 'border-slate-200')),
               ]"
-              draggable="true"
+              :draggable="order.status !== 'CANCELADO'"
               @dragstart="startDrag($event, order, colIndex)"
             >
               <!-- Top Row: Checkbox, ID, Time, Menu -->
@@ -818,7 +820,12 @@ const emitirNFe = (order) => {
                     class="w-4 h-4 rounded border-slate-300 text-orange-600 transition-all cursor-pointer"
                   />
                   <span
-                    :class="['text-xs font-black tracking-tight', column.color]"
+                    :class="[
+                      'text-xs font-black tracking-tight',
+                      order.status === 'CANCELADO'
+                        ? 'text-rose-600 line-through'
+                        : (order.status === 'FINALIZADO' ? 'text-emerald-700' : column.color),
+                    ]"
                     >{{ order.displayId || order.id }}</span
                   >
                 </div>
@@ -870,6 +877,7 @@ const emitirNFe = (order) => {
                           <Edit :size="14" class="text-blue-500" /> Editar
                         </button>
                         <button
+                          v-if="order.status !== 'CANCELADO'"
                           @click.stop="emitirNFe(order)"
                           class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
                         >
@@ -877,7 +885,7 @@ const emitirNFe = (order) => {
                           Emitir NF-e
                         </button>
                         <button
-                          v-if="colIndex < filteredColumns.length - 1"
+                          v-if="colIndex < filteredColumns.length - 1 && order.status !== 'CANCELADO'"
                           @click="advanceOrder(order.id)"
                           class="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2"
                         >
@@ -885,6 +893,7 @@ const emitirNFe = (order) => {
                           Avançar Status
                         </button>
                         <button
+                          v-if="order.status !== 'CANCELADO'"
                           @click="cancelOrder(order, column.id)"
                           :disabled="!canCancelOrder(order, column.id)"
                           :title="
@@ -913,6 +922,20 @@ const emitirNFe = (order) => {
                   {{ order.customerName || "Cliente Avulso" }}
                 </h4>
                 <div class="flex flex-wrap gap-1 mt-1">
+                  <!-- Badges de Status (Concluído Verde / Cancelado Vermelho) -->
+                  <div
+                    v-if="order.status === 'FINALIZADO'"
+                    class="px-2 py-0.5 bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-md text-[10px] font-black uppercase tracking-wider flex items-center gap-1"
+                  >
+                    <CheckCircle2 :size="11" /> Concluído
+                  </div>
+                  <div
+                    v-else-if="order.status === 'CANCELADO'"
+                    class="px-2 py-0.5 bg-rose-100 text-rose-700 border border-rose-300 rounded-md text-[10px] font-black uppercase tracking-wider flex items-center gap-1"
+                  >
+                    <XCircle :size="11" /> Cancelado
+                  </div>
+
                   <div
                     v-if="
                       normalizeOrderContext(order).operation ===
@@ -953,12 +976,18 @@ const emitirNFe = (order) => {
                 </div>
               </div>
 
-              <!-- Items (Compact) -->
-              <p
-                class="text-[10px] text-slate-500 font-medium leading-tight line-clamp-2"
+              <!-- Items (com quebra de linha por item) -->
+              <div
+                class="text-[11px] text-slate-600 font-medium leading-snug space-y-1 break-words overflow-hidden"
               >
-                {{ order.itemsSummary }}
-              </p>
+                <div
+                  v-for="(item, idx) in getOrderItems(order.itemsSummary)"
+                  :key="idx"
+                  class="break-words"
+                >
+                  <span class="text-slate-400 mr-1">•</span>{{ item }}
+                </div>
+              </div>
 
               <!-- Footer: Total & Action -->
               <div
@@ -982,7 +1011,7 @@ const emitirNFe = (order) => {
                     >
                   </button>
                   <button
-                    v-if="colIndex < filteredColumns.length - 1"
+                    v-if="colIndex < filteredColumns.length - 1 && order.status !== 'CANCELADO'"
                     @click="advanceOrder(order.id)"
                     class="px-2 py-1 bg-slate-50 hover:bg-orange-50 text-slate-500 hover:text-orange-600 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 border border-slate-200 hover:border-orange-200"
                   >

@@ -139,14 +139,14 @@
         </p>
       </div>
 
-      <!-- Grid de Tarefas KDS -->
+      <!-- Grid de Pedidos KDS (1 Card por Pedido) -->
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
         <div
-          v-for="task in tasks"
-          :key="task.id"
+          v-for="order in groupedOrders"
+          :key="order.orderId"
           :class="[
             'flex flex-col justify-between rounded-xl border p-4 shadow-lg transition-all duration-300 bg-slate-900',
-            getCardBorderClass(task)
+            getCardBorderClass(order)
           ]"
         >
           <!-- Cabeçalho do Card: Pedido #, Tipo, Canal e Tempo Decorrido -->
@@ -154,120 +154,149 @@
             <div class="flex items-center justify-between pb-2 mb-3 border-b border-slate-800">
               <div class="flex items-center gap-2">
                 <span class="text-xl font-black text-amber-400">
-                  #{{ task.displayOrderId || '---' }}
+                  #{{ order.displayOrderId || '---' }}
                 </span>
                 <span
                   :class="[
                     'text-[10px] font-bold px-2 py-0.5 rounded uppercase',
-                    getOrderTypeBadgeClass(task.orderType)
+                    getOrderTypeBadgeClass(order.orderType)
                   ]"
                 >
-                  {{ task.orderType || 'SALÃO' }}
+                  {{ order.orderType || 'SALÃO' }}
                 </span>
                 <span
-                  v-if="task.orderChannel"
+                  v-if="order.orderChannel"
                   :class="[
                     'text-[10px] font-bold px-1.5 py-0.5 rounded uppercase border',
-                    task.orderChannel === 'IFOOD'
+                    order.orderChannel === 'IFOOD'
                       ? 'border-red-500/40 text-red-400 bg-red-950/40'
                       : 'border-slate-700 text-slate-400'
                   ]"
                 >
-                  {{ task.orderChannel }}
+                  {{ order.orderChannel }}
                 </span>
               </div>
 
-              <!-- Cronômetro de Produção com Alerta Visual -->
+              <!-- Cronômetro de Produção do Pedido com Alerta Visual -->
               <div
                 :class="[
                   'text-xs font-mono font-bold px-2 py-1 rounded flex items-center gap-1',
-                  getTimerClass(task)
+                  getTimerClass(order)
                 ]"
               >
                 <span>⏱️</span>
-                <span>{{ formatElapsedTime(task.createdAt) }}</span>
+                <span>{{ formatElapsedTime(order.createdAt) }}</span>
               </div>
             </div>
 
             <!-- Cliente (se houver) -->
-            <div v-if="task.customerName" class="text-xs text-slate-400 mb-2 truncate">
-              👤 {{ task.customerName }}
+            <div v-if="order.customerName" class="text-xs text-slate-400 mb-2 truncate">
+              👤 {{ order.customerName }}
             </div>
 
-            <!-- Produto / Componente de Combo -->
-            <div class="my-2">
-              <div class="flex items-start gap-2">
-                <span class="text-xl font-black text-amber-500 min-w-[28px]">
-                  {{ task.quantity }}x
-                </span>
-                <div class="flex-1">
-                  <h3 class="text-base font-bold text-white leading-tight">
-                    {{ task.itemName }}
-                  </h3>
-                  <!-- Badge de Combo caso seja componente de combo -->
-                  <div v-if="task.comboName" class="mt-1">
-                    <span class="inline-flex items-center gap-1 text-[11px] font-medium text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/40">
-                      📦 {{ task.comboName }}
+            <!-- Lista de Itens do Pedido no Setor / Estação -->
+            <div class="my-2 space-y-2.5 divide-y divide-slate-800/60">
+              <div
+                v-for="task in order.tasks"
+                :key="task.id"
+                class="pt-2 first:pt-0"
+              >
+                <div class="flex items-start justify-between gap-2">
+                  <div class="flex items-start gap-2 flex-1">
+                    <span class="text-lg font-black text-amber-500 min-w-[24px]">
+                      {{ task.quantity }}x
                     </span>
+                    <div class="flex-1">
+                      <h3 class="text-sm font-bold text-white leading-tight">
+                        {{ task.itemName }}
+                      </h3>
+                      <!-- Badge de Combo caso seja componente de combo -->
+                      <div v-if="task.comboName" class="mt-0.5">
+                        <span class="inline-flex items-center gap-1 text-[10px] font-medium text-amber-300 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-800/40">
+                          📦 {{ task.comboName }}
+                        </span>
+                      </div>
+
+                      <!-- Adicionais / Modificadores -->
+                      <div v-if="task.modifiersSummary" class="mt-1 text-[11px] text-slate-300 bg-slate-800/60 p-1.5 rounded border border-slate-700/40">
+                        <span class="text-slate-400 font-medium">Adicionais:</span> {{ task.modifiersSummary }}
+                      </div>
+
+                      <!-- Observações em Destaque (ex: "Sem Cebola") -->
+                      <div v-if="task.notes" class="mt-1 text-[11px] font-semibold text-amber-200 bg-amber-500/10 p-1.5 rounded border border-amber-500/30">
+                        ⚠️ {{ task.notes }}
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Ações rápidas por item -->
+                  <div class="flex flex-col items-end gap-1 shrink-0">
+                    <span
+                      v-if="task.status === 'IN_PREPARATION'"
+                      class="bg-blue-500/20 text-blue-400 font-bold px-1.5 py-0.5 rounded text-[10px] animate-pulse"
+                    >
+                      🔥 Preparo
+                    </span>
+                    <span
+                      v-else
+                      class="bg-slate-800 text-slate-400 font-medium px-1.5 py-0.5 rounded text-[10px]"
+                    >
+                      ⏳ Fila
+                    </span>
+
+                    <div class="flex items-center gap-1 mt-0.5">
+                      <button
+                        v-if="task.status === 'PENDING'"
+                        @click="startTask(task)"
+                        :disabled="task._loading"
+                        title="Iniciar este item"
+                        class="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white px-2 py-1 rounded text-[11px] font-bold transition shadow"
+                      >
+                        🔥
+                      </button>
+                      <button
+                        @click="completeTask(task)"
+                        :disabled="task._loading"
+                        title="Concluir este item"
+                        class="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white px-2 py-1 rounded text-[11px] font-bold transition shadow"
+                      >
+                        ✓
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <!-- Adicionais / Modificadores -->
-              <div v-if="task.modifiersSummary" class="mt-2 text-xs text-slate-300 bg-slate-800/60 p-2 rounded border border-slate-700/40">
-                <span class="text-slate-400 font-medium">Adicionais:</span> {{ task.modifiersSummary }}
-              </div>
-
-              <!-- Observações em Destaque (ex: "Sem Cebola") -->
-              <div v-if="task.notes" class="mt-2 text-xs font-semibold text-amber-200 bg-amber-500/10 p-2 rounded border border-amber-500/30">
-                ⚠️ {{ task.notes }}
               </div>
             </div>
           </div>
 
-          <!-- Rodapé do Card: Status + Botões Touch de Ação -->
+          <!-- Rodapé do Card: Resumo do Pedido + Botões de Ação em Lote -->
           <div class="mt-4 pt-3 border-t border-slate-800/80 flex flex-col gap-2">
-            <!-- Badge de Status -->
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-400">Status:</span>
-              <span
-                v-if="task.status === 'IN_PREPARATION'"
-                class="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded text-[11px] animate-pulse flex items-center gap-1"
-              >
-                🔥 Em Preparo
-              </span>
-              <span
-                v-else
-                class="bg-slate-800 text-slate-400 font-medium px-2 py-0.5 rounded text-[11px]"
-              >
-                ⏳ Aguardando
+            <!-- Resumo de status no setor -->
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span>{{ order.tasks.length }} {{ order.tasks.length === 1 ? 'item' : 'itens' }}</span>
+              <span class="font-medium text-slate-300">
+                {{ order.tasks.filter(t => t.status === 'IN_PREPARATION').length }} em preparo
               </span>
             </div>
 
-            <!-- Botões Grandes Touch de Ação -->
+            <!-- Botões Grandes de Ação para o Pedido Inteiro no Setor -->
             <div class="grid grid-cols-2 gap-2 mt-1">
-              <!-- Botão Iniciar (caso ainda em PENDING) -->
               <button
-                v-if="task.status === 'PENDING'"
-                @click="startTask(task)"
-                :disabled="task._loading"
-                class="w-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-2.5 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1 shadow"
+                v-if="order.tasks.some(t => t.status === 'PENDING')"
+                @click="startAllOrderTasks(order)"
+                class="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-2.5 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1 shadow"
               >
-                <span>🔥 Iniciar</span>
+                <span>🔥 Iniciar Todos</span>
               </button>
 
-              <!-- Botão Concluir / Finalizar (sai da tela ativa!) -->
               <button
-                @click="completeTask(task)"
-                :disabled="task._loading"
+                @click="completeAllOrderTasks(order)"
                 :class="[
-                  'font-bold py-2.5 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1 shadow active:scale-95',
-                  task.status === 'IN_PREPARATION'
-                    ? 'col-span-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm py-3'
-                    : 'bg-emerald-700/80 hover:bg-emerald-600 text-slate-100'
+                  'font-bold py-2.5 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1 shadow active:scale-95 bg-emerald-600 hover:bg-emerald-500 text-white',
+                  order.tasks.some(t => t.status === 'PENDING') ? '' : 'col-span-2 py-3 text-sm'
                 ]"
               >
-                <span>✓ Concluir</span>
+                <span>✓ Concluir Todos</span>
               </button>
             </div>
           </div>
@@ -351,7 +380,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import kdsService from "@/services/kdsService";
 
@@ -366,6 +395,31 @@ const loading = ref(false);
 const sseConnected = ref(false);
 const isFullscreen = ref(false);
 const showHistory = ref(false);
+
+// Agrupamento de tarefas por Pedido (1 Card por Pedido no KDS)
+const groupedOrders = computed(() => {
+  const map = new Map();
+  for (const task of tasks.value) {
+    if (!map.has(task.orderId)) {
+      map.set(task.orderId, {
+        orderId: task.orderId,
+        displayOrderId: task.displayOrderId,
+        orderType: task.orderType,
+        orderChannel: task.orderChannel,
+        customerName: task.customerName,
+        createdAt: task.createdAt,
+        tasks: [],
+      });
+    }
+    const orderGroup = map.get(task.orderId);
+    orderGroup.tasks.push(task);
+    // Preservar o createdAt mais antigo para o cronômetro do pedido
+    if (new Date(task.createdAt) < new Date(orderGroup.createdAt)) {
+      orderGroup.createdAt = task.createdAt;
+    }
+  }
+  return Array.from(map.values());
+});
 
 const settings = ref({
   warningAlertMinutes: 10,
@@ -452,6 +506,18 @@ async function completeTask(task) {
     console.error("Erro ao concluir tarefa:", err);
     task._loading = false;
   }
+}
+
+// Iniciar todas as tarefas pendentes do pedido
+async function startAllOrderTasks(order) {
+  const pendings = order.tasks.filter((t) => t.status === "PENDING");
+  await Promise.all(pendings.map((t) => startTask(t)));
+}
+
+// Concluir todas as tarefas do pedido nesta estação
+async function completeAllOrderTasks(order) {
+  const currentTasks = [...order.tasks];
+  await Promise.all(currentTasks.map((t) => completeTask(t)));
 }
 
 // Reabrir Tarefa do Histórico

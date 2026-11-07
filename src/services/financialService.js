@@ -22,8 +22,11 @@ export const financialService = {
     return response.data;
   },
 
-  getDashboard: async () => {
-    const response = await api.get("/dashboard");
+  getDashboard: async (period = "daily", startDate = null, endDate = null) => {
+    const params = { period };
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await api.get("/dashboard", { params });
     return response.data;
   },
 };

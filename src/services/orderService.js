@@ -4,6 +4,9 @@ export const orderService = {
   getKanban: async (typeFilter = "") =>
     (await api.get("/orders/kanban", { params: { type: typeFilter } })).data,
 
+  getHistory: async (date) =>
+    (await api.get("/orders/history", { params: { date } })).data,
+
   getById: async (id) => (await api.get(`/orders/${id}`)).data,
   create: async (data) => (await api.post("/orders", data)).data,
   update: async (id, data) => (await api.put(`/orders/${id}`, data)).data,
