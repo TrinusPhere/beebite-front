@@ -1,0 +1,32 @@
+# =============================================================================
+# Bitbucket Pipelines — biteflow-front (Deploy Grátis no Cloudflare Pages)
+# =============================================================================
+# Variáveis necessárias em Repository Settings -> Repository variables:
+#   CLOUDFLARE_API_TOKEN  : Token da Cloudflare com permissão "Cloudflare Pages: Edit"
+#   CLOUDFLARE_ACCOUNT_ID : ID da sua conta Cloudflare
+#   VITE_API_URL          : https://api.seudominio.com.br
+# =============================================================================
+image: node:22-alpine
+
+pipelines:
+  branches:
+    main:
+      - step:
+          name: Build Vue SPA & Deploy to Cloudflare Pages
+          caches:
+            - node
+          script:
+            - npm ci
+            - VITE_API_URL=${VITE_API_URL:-https://api.chefsburguer.com.br} npm run build
+            - npx --yes wrangler@latest pages deploy dist --project-name=biteflow-front --branch=main
+  custom:
+    deploy-cloudflare-pages:
+      - step:
+          name: Build Vue SPA & Deploy to Cloudflare Pages (Manual)
+          caches:
+            - node
+          script:
+            - npm ci
+            - VITE_API_URL=${VITE_API_URL:-https://api.chefsburguer.com.br} npm run build
+            - npx --yes wrangler@latest pages deploy dist --project-name=biteflow-front --branch=main
+

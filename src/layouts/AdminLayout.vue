@@ -1,20 +1,39 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import Sidebar from "../components/ui/Sidebar.vue";
-import { Bell, Search, UserCircle, Menu, X, LogOut, Settings } from "lucide-vue-next";
+import {
+  Bell,
+  Search,
+  Menu,
+  X,
+  LogOut,
+  Settings,
+  Store,
+  ChevronDown,
+  Check,
+  Cloud,
+  HardDrive,
+} from "lucide-vue-next";
 import { authState } from "../utils/auth";
 import StoreSettingsModal from "../components/StoreSettingsModal.vue";
 
 const router = useRouter();
 const isMobileMenuOpen = ref(false);
 const isStoreSettingsOpen = ref(false);
+const isStoreSwitcherOpen = ref(false);
+const storeViewKey = ref(0);
+
+onMounted(() => {
+  if (authState.currentUser) {
+    authState.refreshAccessibleStores();
+  }
+});
 
 const toggleMobileMenu = () => {
   isMobileMenuOpen.value = !isMobileMenuOpen.value;
 };
 
-// Computed properties para exibir informações do usuário
 const userName = computed(() =>
   authState.currentUser ? authState.currentUser.name : "Convidado",
 );
@@ -22,9 +41,51 @@ const userRole = computed(() =>
   authState.currentUser ? authState.currentUser.role : "N/A",
 );
 
+const hasMultipleStores = computed(
+  () => Array.isArray(authState.accessibleStores) && authState.accessibleStores.length > 1,
+);
+
+const activeStore = computed(() => {
+  if (!Array.isArray(authState.accessibleStores) || authState.accessibleStores.length === 0) {
+    return null;
+  }
+  return (
+    authState.accessibleStores.find((s) => s.activeContext) ||
+    authState.accessibleStores.find(
+      (s) => authState.currentUser && s.storeId === authState.currentUser.storeId,
+    ) ||
+    authState.accessibleStores[0]
+  );
+});
+
+const formatSyncTime = (isoTimestamp) => {
+  if (!isoTimestamp) return "Aguardando 1º sync";
+  try {
+    const diffSec = Math.max(0, Math.floor((Date.now() - new Date(isoTimestamp).getTime()) / 1000));
+    if (diffSec < 60) return `Sincronizado há ${diffSec}s`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `Sincronizado há ${diffMin}min`;
+    const diffHours = Math.floor(diffMin / 60);
+    return `Sincronizado há ${diffHours}h`;
+  } catch {
+    return "Sincronizado";
+  }
+};
+
+const handleSwitchStore = async (targetStoreId) => {
+  isStoreSwitcherOpen.value = false;
+  if (authState.currentUser && authState.currentUser.storeId === targetStoreId) {
+    return;
+  }
+  const switched = await authState.switchStore(targetStoreId);
+  if (switched) {
+    storeViewKey.value += 1;
+  }
+};
+
 const handleLogout = () => {
   authState.logout();
-  router.push("/"); // Redireciona para a página de login
+  router.push("/");
 };
 </script>
 
@@ -37,6 +98,13 @@ const handleLogout = () => {
       v-if="isMobileMenuOpen"
       @click="isMobileMenuOpen = false"
       class="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 md:hidden"
+    ></div>
+
+    <!-- Overlay invisível para fechar o dropdown de lojas -->
+    <div
+      v-if="isStoreSwitcherOpen"
+      @click="isStoreSwitcherOpen = false"
+      class="fixed inset-0 z-30"
     ></div>
 
     <!-- Sidebar: Adaptável -->
@@ -53,9 +121,9 @@ const handleLogout = () => {
     <main class="flex-1 flex flex-col min-w-0 overflow-hidden w-full">
       <!-- Navbar Clara -->
       <header
-        class="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-4 md:px-8 shadow-sm z-30"
+        class="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-4 md:px-8 shadow-sm z-40"
       >
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-3 md:gap-4">
           <button
             @click="toggleMobileMenu"
             class="p-2 hover:bg-slate-100 rounded-lg md:hidden text-slate-500"
@@ -64,7 +132,98 @@ const handleLogout = () => {
             <X v-else :size="24" />
           </button>
 
-          <div class="relative hidden sm:block max-w-xs lg:max-w-md w-full">
+          <!-- Store Switcher Adaptativo: exibe seletor apenas quando o usuário possui > 1 loja vinculada -->
+          <div v-if="hasMultipleStores && activeStore" class="relative">
+            <button
+              @click="isStoreSwitcherOpen = !isStoreSwitcherOpen"
+              :disabled="authState.switchingStore"
+              class="flex items-center gap-2.5 bg-orange-50/80 hover:bg-orange-100/80 border border-orange-200/80 text-slate-800 px-3 py-1.5 rounded-xl transition-all text-left"
+              title="Alternar unidade sem sair da conta"
+            >
+              <div
+                class="w-7 h-7 rounded-lg bg-orange-500 text-white flex items-center justify-center shrink-0 shadow-sm"
+              >
+                <Store :size="15" />
+              </div>
+              <div class="max-w-[150px] sm:max-w-[220px]">
+                <p class="text-xs font-bold leading-tight truncate text-slate-900">
+                  {{ activeStore.storeName }}
+                </p>
+                <p class="text-[10px] text-slate-500 font-medium flex items-center gap-1 truncate">
+                  <span
+                    :class="[
+                      'w-1.5 h-1.5 rounded-full inline-block',
+                      activeStore.syncMode === 'EDGE' ? 'bg-amber-500' : 'bg-emerald-500',
+                    ]"
+                  ></span>
+                  {{
+                    activeStore.syncMode === "EDGE"
+                      ? formatSyncTime(activeStore.lastEdgeSyncAt)
+                      : "Unidade Online (Cloud)"
+                  }}
+                </p>
+              </div>
+              <ChevronDown
+                :size="16"
+                class="text-slate-500 transition-transform duration-200"
+                :class="{ 'rotate-180': isStoreSwitcherOpen }"
+              />
+            </button>
+
+            <!-- Dropdown de Unidades -->
+            <div
+              v-if="isStoreSwitcherOpen"
+              class="absolute left-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl py-2 z-50"
+            >
+              <div class="px-3.5 py-1.5 border-b border-slate-100">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Alternar Unidade ({{ authState.accessibleStores.length }} lojas)
+                </p>
+              </div>
+              <button
+                v-for="storeItem in authState.accessibleStores"
+                :key="storeItem.storeId"
+                @click="handleSwitchStore(storeItem.storeId)"
+                class="w-full px-3.5 py-2.5 flex items-center justify-between hover:bg-slate-50 transition-colors text-left"
+              >
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <div
+                    :class="[
+                      'w-8 h-8 rounded-xl flex items-center justify-center shrink-0',
+                      storeItem.activeContext
+                        ? 'bg-orange-500 text-white'
+                        : 'bg-slate-100 text-slate-500',
+                    ]"
+                  >
+                    <HardDrive v-if="storeItem.syncMode === 'EDGE'" :size="15" />
+                    <Cloud v-else :size="15" />
+                  </div>
+                  <div class="min-w-0">
+                    <p
+                      class="text-xs font-bold truncate"
+                      :class="storeItem.activeContext ? 'text-orange-600' : 'text-slate-800'"
+                    >
+                      {{ storeItem.storeName }}
+                    </p>
+                    <p class="text-[10px] text-slate-400 truncate">
+                      {{
+                        storeItem.syncMode === "EDGE"
+                          ? `PDV Local · ${formatSyncTime(storeItem.lastEdgeSyncAt)}`
+                          : "Nuvem · Tempo Real"
+                      }}
+                    </p>
+                  </div>
+                </div>
+                <Check
+                  v-if="storeItem.activeContext"
+                  :size="16"
+                  class="text-orange-500 shrink-0"
+                />
+              </button>
+            </div>
+          </div>
+
+          <div class="relative hidden lg:block max-w-xs w-full">
             <Search
               class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
               :size="18"
@@ -122,11 +281,11 @@ const handleLogout = () => {
         </div>
       </header>
 
-      <!-- Conteúdo Principal -->
+      <!-- Conteúdo Principal (recarrega automaticamente ao trocar de loja via storeViewKey) -->
       <div class="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50/50">
         <router-view v-slot="{ Component }">
           <transition name="page" mode="out-in">
-            <div class="p-4 md:p-8 max-w-[1600px] mx-auto">
+            <div :key="storeViewKey" class="p-4 md:p-8 max-w-[1600px] mx-auto">
               <component :is="Component" />
             </div>
           </transition>
@@ -134,9 +293,9 @@ const handleLogout = () => {
       </div>
     </main>
 
-    <StoreSettingsModal 
-      v-if="isStoreSettingsOpen" 
-      @close="isStoreSettingsOpen = false" 
+    <StoreSettingsModal
+      v-if="isStoreSettingsOpen"
+      @close="isStoreSettingsOpen = false"
     />
   </div>
 </template>

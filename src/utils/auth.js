@@ -2,50 +2,116 @@ import { reactive } from "vue";
 import { authService } from "@/services/authService";
 
 const CURRENT_USER_KEY = "biteflow_current_user";
+const ACCESSIBLE_STORES_KEY = "biteflow_accessible_stores";
 
 const loadCurrentUser = () => {
   const saved = localStorage.getItem(CURRENT_USER_KEY);
-
   if (saved) {
-    return JSON.parse(saved);
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return null;
+    }
   }
   return null;
 };
 
+const loadAccessibleStores = () => {
+  const saved = localStorage.getItem(ACCESSIBLE_STORES_KEY);
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
 export const authState = reactive({
   currentUser: loadCurrentUser(),
+  accessibleStores: loadAccessibleStores(),
+  switchingStore: false,
 
   async login(login, password) {
     try {
       const response = await authService.login(login, password);
       if (response && response.token) {
-        // A API já envia o Set-Cookie para autenticação automática do navegador.
-        // Opcionalmente retém o token para integrações, mas o painel ignora.
         this.currentUser = response.user;
+        this.accessibleStores = Array.isArray(response.accessibleStores)
+          ? response.accessibleStores
+          : [];
         localStorage.setItem(
           CURRENT_USER_KEY,
           JSON.stringify(this.currentUser),
+        );
+        localStorage.setItem(
+          ACCESSIBLE_STORES_KEY,
+          JSON.stringify(this.accessibleStores),
         );
         return true;
       }
       return false;
     } catch (error) {
       console.error("Erro no login", error);
-      throw error; // Lança para o componente tratar
+      throw error;
+    }
+  },
+
+  async refreshAccessibleStores() {
+    if (!this.currentUser) return [];
+    try {
+      const stores = await authService.getAccessibleStores();
+      if (Array.isArray(stores)) {
+        this.accessibleStores = stores;
+        localStorage.setItem(ACCESSIBLE_STORES_KEY, JSON.stringify(stores));
+      }
+      return this.accessibleStores;
+    } catch (error) {
+      console.warn("Não foi possível carregar lojas vinculadas", error);
+      return this.accessibleStores;
+    }
+  },
+
+  async switchStore(targetStoreId) {
+    if (!targetStoreId || this.switchingStore) return false;
+    this.switchingStore = true;
+    try {
+      const response = await authService.switchStore(targetStoreId);
+      if (response && response.user) {
+        this.currentUser = response.user;
+        this.accessibleStores = Array.isArray(response.accessibleStores)
+          ? response.accessibleStores
+          : this.accessibleStores;
+        localStorage.setItem(
+          CURRENT_USER_KEY,
+          JSON.stringify(this.currentUser),
+        );
+        localStorage.setItem(
+          ACCESSIBLE_STORES_KEY,
+          JSON.stringify(this.accessibleStores),
+        );
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Erro ao alternar de loja", error);
+      throw error;
+    } finally {
+      this.switchingStore = false;
     }
   },
 
   logout() {
     this.currentUser = null;
+    this.accessibleStores = [];
     localStorage.removeItem(CURRENT_USER_KEY);
-    // Tenta invalidar o cookie HttpOnly batendo na API
+    localStorage.removeItem(ACCESSIBLE_STORES_KEY);
     authService.logout();
   },
 
   hasPermission(permission) {
     if (!this.currentUser) return false;
-
-    // A validação de sessão agora depende da API. Se uma chamada falhar com 401, o api.js cuidará do logout.
     if (this.currentUser.role === "ADMIN") return true;
     return (
       this.currentUser.permissions &&
