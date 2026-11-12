@@ -1,10 +1,10 @@
-# 🍔 BiteFlow - Sistema de Gerenciamento de Lanchonetes
+# 🍔 BeeBite - Sistema de Gerenciamento de Lanchonetes
 
-O **BiteFlow** é um Sistema de Gerenciamento de Vendas (Front-End) moderno e intuitivo, desenvolvido especialmente para o setor alimentício. Focado em agilidade operacional e uma experiência de usuário (UI/UX) sofisticada.
+O **BeeBite** é um Sistema de Gerenciamento de Vendas (Front-End) moderno e intuitivo, desenvolvido especialmente para o setor alimentício. Focado em agilidade operacional e uma experiência de usuário (UI/UX) sofisticada.
 
 ## 🚀 Panorama do Projeto
 
-O **BiteFlow** é uma Single Page Application (SPA) que centraliza o controle operacional de uma lanchonete, permitindo a gestão eficiente de:
+O **BeeBite** é uma Single Page Application (SPA) que centraliza o controle operacional de uma lanchonete, permitindo a gestão eficiente de:
 - **Controle de Pedidos:** Painel Kanban para Delivery e Balcão com ações em massa.
 - **Clientes:** Cadastro, edição e histórico de pedidos.
 - **Ingredientes:** Controle de estoque de insumos e custos.
@@ -36,7 +36,7 @@ Acesse o endereço exibido no terminal (geralmente `http://localhost:8080`).
 
 ---
 
-## 🎨 Diferenciais do BiteFlow
+## 🎨 Diferenciais do BeeBite
 
 - **UI Gourmet Fresh:** Paleta clara, limpa e moderna focada em legibilidade.
 - **Ficha Técnica Inteligente:** Cálculo automático de lucro baseado nos ingredientes.
