@@ -3,6 +3,7 @@ import { reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { LogIn, Lock, User, AlertCircle } from "lucide-vue-next";
 import BaseButton from "@/components/BaseButton.vue";
+import BeeBiteLogo from "@/components/ui/BeeBiteLogo.vue";
 import { authState } from "@/utils/auth"; // Importar authState
 
 const router = useRouter();
@@ -40,16 +41,11 @@ const handleLogin = async () => {
   <div class="min-h-screen bg-slate-50 flex items-center justify-center p-4">
     <div class="w-full max-w-md">
       <!-- Logo/Header -->
-      <div class="text-center mb-8">
-        <div
-          class="inline-flex items-center justify-center w-16 h-16 bg-orange-500 rounded-2xl mb-4 shadow-lg shadow-orange-500/20 rotate-3 transition-transform hover:rotate-0 duration-500"
-        >
-          <span class="text-white text-3xl font-black font-sans">BF</span>
+      <div class="text-center mb-6">
+        <div class="flex justify-center mb-2 transform transition-transform hover:scale-105 duration-300">
+          <BeeBiteLogo variant="stacked" />
         </div>
-        <h1 class="text-3xl font-bold text-slate-800 tracking-tight">
-          BiteFlow
-        </h1>
-        <p class="text-slate-500 mt-2 font-medium">
+        <p class="text-xs font-bold uppercase tracking-widest text-slate-400 mt-1">
           Controle de Vendas & Delivery
         </p>
       </div>

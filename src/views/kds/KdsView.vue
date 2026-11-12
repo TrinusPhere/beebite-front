@@ -5,9 +5,9 @@
       <!-- Esquerda: Título + Estações -->
       <div class="flex items-center gap-4">
         <div class="flex items-center gap-2">
-          <span class="text-2xl">🍳</span>
+          <img src="/logo/beebite-icon.png" alt="BeeBite" class="w-8 h-8 object-contain" />
           <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            BiteFlow <span class="bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded border border-amber-500/30 font-semibold uppercase">KDS</span>
+            BeeBite <span class="bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded border border-amber-500/30 font-semibold uppercase">KDS</span>
           </h1>
         </div>
 

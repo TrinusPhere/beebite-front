@@ -1,8 +1,8 @@
 import { reactive } from "vue";
 import { authService } from "@/services/authService";
 
-const CURRENT_USER_KEY = "biteflow_current_user";
-const ACCESSIBLE_STORES_KEY = "biteflow_accessible_stores";
+const CURRENT_USER_KEY = "beebite_current_user";
+const ACCESSIBLE_STORES_KEY = "beebite_accessible_stores";
 
 const loadCurrentUser = () => {
   const saved = localStorage.getItem(CURRENT_USER_KEY);

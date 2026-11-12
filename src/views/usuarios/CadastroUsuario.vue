@@ -255,7 +255,7 @@ const cancel = () => {
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
             <div>
               <h3 class="text-sm font-bold text-slate-800">Módulos e Permissões de Acesso</h3>
-              <p class="text-xs text-slate-400">Selecione quais áreas do BiteFlow este usuário terá permissão para acessar.</p>
+              <p class="text-xs text-slate-400">Selecione quais áreas do BeeBite este usuário terá permissão para acessar.</p>
             </div>
             <label class="flex items-center gap-2 cursor-pointer bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 transition text-xs font-bold text-slate-700 self-start sm:self-auto">
               <input

@@ -21,7 +21,7 @@ defineProps({
       size === 'lg' ? 'px-8 py-4 text-base' : '',
 
       variant === 'primary'
-        ? 'bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-[0_8px_20px_-6px_rgba(249,115,22,0.5)] hover:shadow-[0_12px_25px_-4px_rgba(249,115,22,0.6)] hover:-translate-y-0.5'
+        ? 'bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 text-slate-900 font-extrabold shadow-[0_8px_20px_-6px_rgba(245,158,11,0.5)] hover:shadow-[0_12px_25px_-4px_rgba(245,158,11,0.65)] hover:-translate-y-0.5 border border-amber-400/30'
         : '',
       variant === 'secondary'
         ? 'bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700'

@@ -25,6 +25,7 @@ import {
   Wallet,
 } from "lucide-vue-next";
 import { authState } from "@/utils/auth";
+import BeeBiteLogo from "./BeeBiteLogo.vue";
 
 const emit = defineEmits(["close-mobile"]);
 const router = useRouter();
@@ -171,17 +172,8 @@ const handleLogout = () => {
   >
     <!-- Header Sidebar -->
     <div class="p-6 flex items-center justify-between">
-      <div class="flex items-center gap-3 overflow-hidden">
-        <div
-          class="min-w-[32px] w-8 h-8 bg-orange-500 rounded-xl flex items-center justify-center font-black text-white shadow-lg shadow-orange-500/30"
-        >
-          BF
-        </div>
-        <span
-          v-if="!isCollapsed"
-          class="text-lg font-bold text-slate-800 tracking-tight whitespace-nowrap"
-          >BiteFlow</span
-        >
+      <div class="flex items-center overflow-hidden">
+        <BeeBiteLogo :variant="isCollapsed ? 'icon' : 'horizontal'" />
       </div>
       <button
         @click="$emit('close-mobile')"

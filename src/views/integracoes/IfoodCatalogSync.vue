@@ -180,7 +180,7 @@ const formatStatus = (status) => {
             <thead class="bg-slate-50 text-slate-500 border-b">
               <tr>
                 <th class="px-6 py-4 font-bold">Status</th>
-                <th class="px-6 py-4 font-bold w-1/3">Item no BiteFlow (PDV)</th>
+                <th class="px-6 py-4 font-bold w-1/3">Item no BeeBite (PDV)</th>
                 <th class="px-6 py-4 font-bold w-1/3">Item no iFood</th>
                 <th class="px-6 py-4 font-bold text-right">Ação</th>
               </tr>
