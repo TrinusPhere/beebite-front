@@ -17,6 +17,10 @@ import {
   Printer,
   CheckCircle2,
   XCircle,
+  Search,
+  ChefHat,
+  Truck,
+  PackageCheck,
 } from "lucide-vue-next";
 import BaseButton from "@/components/BaseButton.vue";
 import ChatDrawer from "@/components/ChatDrawer.vue";
@@ -193,7 +197,7 @@ const toggleMenu = (id) => {
 };
 
 const canCancelOrder = (order, columnId = "") =>
-  !["EM_ROTA", "FINALIZADO", "CANCELADO"].includes(
+  !["EM_ROTA", "ENTREGUE", "FINALIZADO", "CANCELADO"].includes(
     String(order?.status || columnId).toUpperCase(),
   );
 
@@ -220,15 +224,53 @@ const cancelOrder = async (order, columnId) => {
   }
 };
 
+const COLUMN_CONFIG = {
+  ANALISE: {
+    bg: "bg-amber-500/10",
+    color: "text-amber-600",
+    icon: Search,
+  },
+  PREPARO: {
+    bg: "bg-blue-500/10",
+    color: "text-blue-600",
+    icon: ChefHat,
+  },
+  EM_ROTA: {
+    bg: "bg-purple-500/10",
+    color: "text-purple-600",
+    icon: Truck,
+  },
+  ENTREGUE: {
+    bg: "bg-cyan-500/10",
+    color: "text-cyan-600",
+    icon: PackageCheck,
+  },
+  FINALIZADO: {
+    bg: "bg-emerald-500/10",
+    color: "text-emerald-600",
+    icon: CheckCircle2,
+  },
+};
+
 // Computado para aplicar o filtro nas colunas
 const filteredColumns = computed(() => {
   if (!columns.value) return [];
-  return columns.value.map((col) => ({
-    ...col,
-    orders: col.orders.filter((order) =>
-      activeOperations.value.includes(normalizeOrderContext(order).operation),
-    ),
-  }));
+  return columns.value.map((col) => {
+    const config = COLUMN_CONFIG[col.id] || {
+      bg: "bg-slate-100",
+      color: "text-slate-600",
+      icon: CheckCircle2,
+    };
+    return {
+      ...col,
+      bg: config.bg,
+      color: config.color,
+      iconComponent: config.icon,
+      orders: (col.orders || []).filter((order) =>
+        activeOperations.value.includes(normalizeOrderContext(order).operation),
+      ),
+    };
+  });
 });
 
 const toggleOperation = (operation) => {
@@ -765,7 +807,7 @@ const emitirNFe = (order) => {
               @change="toggleAllInColumn(colIndex, $event.target.checked)"
             />
             <div :class="['p-2 rounded-lg', column.bg, column.color]">
-              <component :is="column.icon" :size="18" />
+              <component :is="column.iconComponent || column.icon" :size="18" />
             </div>
             <h3
               :class="[
@@ -799,14 +841,18 @@ const emitirNFe = (order) => {
                   ? 'bg-rose-50/40 border-rose-300'
                   : (order.status === 'FINALIZADO'
                       ? 'bg-emerald-50/20 border-emerald-200'
-                      : column.bg),
+                      : (order.status === 'ENTREGUE'
+                          ? 'bg-cyan-50/20 border-cyan-200'
+                          : column.bg)),
                 order.selected
                   ? 'ring-2 ring-orange-500/5'
                   : (order.status === 'CANCELADO'
                       ? 'border-rose-300'
                       : (order.status === 'FINALIZADO'
                           ? 'border-emerald-200'
-                          : 'border-slate-200')),
+                          : (order.status === 'ENTREGUE'
+                              ? 'border-cyan-200'
+                              : 'border-slate-200'))),
               ]"
               :draggable="order.status !== 'CANCELADO'"
               @dragstart="startDrag($event, order, colIndex)"
@@ -824,7 +870,11 @@ const emitirNFe = (order) => {
                       'text-xs font-black tracking-tight',
                       order.status === 'CANCELADO'
                         ? 'text-rose-600 line-through'
-                        : (order.status === 'FINALIZADO' ? 'text-emerald-700' : column.color),
+                        : (order.status === 'FINALIZADO'
+                            ? 'text-emerald-700'
+                            : (order.status === 'ENTREGUE'
+                                ? 'text-cyan-700'
+                                : column.color)),
                     ]"
                     >{{ order.displayId || order.id }}</span
                   >
@@ -922,7 +972,7 @@ const emitirNFe = (order) => {
                   {{ order.customerName || "Cliente Avulso" }}
                 </h4>
                 <div class="flex flex-wrap gap-1 mt-1">
-                  <!-- Badges de Status (Concluído Verde / Cancelado Vermelho) -->
+                  <!-- Badges de Status (Concluído Verde / Entregue Ciano / Cancelado Vermelho) -->
                   <div
                     v-if="order.status === 'FINALIZADO'"
                     class="px-2 py-0.5 bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-md text-[10px] font-black uppercase tracking-wider flex items-center gap-1"
@@ -930,10 +980,25 @@ const emitirNFe = (order) => {
                     <CheckCircle2 :size="11" /> Concluído
                   </div>
                   <div
+                    v-else-if="order.status === 'ENTREGUE'"
+                    class="px-2 py-0.5 bg-cyan-100 text-cyan-800 border border-cyan-300 rounded-md text-[10px] font-black uppercase tracking-wider flex items-center gap-1"
+                  >
+                    <PackageCheck :size="11" /> Entregue
+                  </div>
+                  <div
                     v-else-if="order.status === 'CANCELADO'"
                     class="px-2 py-0.5 bg-rose-100 text-rose-700 border border-rose-300 rounded-md text-[10px] font-black uppercase tracking-wider flex items-center gap-1"
                   >
                     <XCircle :size="11" /> Cancelado
+                  </div>
+
+                  <!-- PIN do iFood (últimos 4 dígitos do telefone do cliente) -->
+                  <div
+                    v-if="order.platform === 'IFOOD' && order.customerPhone"
+                    class="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-[10px] font-bold flex items-center gap-1 shadow-2xs"
+                    title="Código de confirmação de entrega do cliente (4 últimos dígitos)"
+                  >
+                    <span>PIN: <b>{{ order.customerPhone.slice(-4) }}</b></span>
                   </div>
 
                   <div
@@ -1015,7 +1080,8 @@ const emitirNFe = (order) => {
                     @click="advanceOrder(order.id)"
                     class="px-2 py-1 bg-slate-50 hover:bg-orange-50 text-slate-500 hover:text-orange-600 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 border border-slate-200 hover:border-orange-200"
                   >
-                    Avançar <ChevronRight :size="12" />
+                    <span>{{ order.status === 'EM_ROTA' ? 'Confirmar Entrega' : (order.status === 'ENTREGUE' ? 'Finalizar' : 'Avançar') }}</span>
+                    <ChevronRight :size="12" />
                   </button>
                 </div>
               </div>
