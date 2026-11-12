@@ -3,6 +3,7 @@ import { authService } from "@/services/authService";
 
 const CURRENT_USER_KEY = "beebite_current_user";
 const ACCESSIBLE_STORES_KEY = "beebite_accessible_stores";
+const TOKEN_KEY = "beebite_token";
 
 const loadCurrentUser = () => {
   const saved = localStorage.getItem(CURRENT_USER_KEY);
@@ -41,6 +42,7 @@ export const authState = reactive({
         this.accessibleStores = Array.isArray(response.accessibleStores)
           ? response.accessibleStores
           : [];
+        localStorage.setItem(TOKEN_KEY, response.token);
         localStorage.setItem(
           CURRENT_USER_KEY,
           JSON.stringify(this.currentUser),
@@ -80,6 +82,9 @@ export const authState = reactive({
       const response = await authService.switchStore(targetStoreId);
       if (response && response.user) {
         this.currentUser = response.user;
+        if (response.token) {
+          localStorage.setItem(TOKEN_KEY, response.token);
+        }
         this.accessibleStores = Array.isArray(response.accessibleStores)
           ? response.accessibleStores
           : this.accessibleStores;
@@ -105,6 +110,7 @@ export const authState = reactive({
   logout() {
     this.currentUser = null;
     this.accessibleStores = [];
+    localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(CURRENT_USER_KEY);
     localStorage.removeItem(ACCESSIBLE_STORES_KEY);
     authService.logout();

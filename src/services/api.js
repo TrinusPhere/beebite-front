@@ -2,18 +2,26 @@ import axios from "axios";
 import { authState } from "@/utils/auth";
 import router from "@/router";
 
+const rawBaseUrl = import.meta.env.VITE_API_URL
+  ? import.meta.env.VITE_API_URL.replace(/\/$/, "")
+  : "";
+const baseURL = `${rawBaseUrl}/api/v1`;
+
 const api = axios.create({
-  baseURL: "/api/v1",
+  baseURL,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Interceptador de requisição
+// Interceptador de requisição — suporta Cookie HttpOnly E Authorization Header Bearer token
 api.interceptors.request.use(
   (config) => {
-    // O token não é mais injetado via Header pois agora usamos Cookie HttpOnly
+    const token = localStorage.getItem("beebite_token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => {
