@@ -4,7 +4,7 @@
 # Variáveis necessárias em Repository Settings -> Repository variables:
 #   CLOUDFLARE_API_TOKEN  : Token da Cloudflare com permissão "Cloudflare Pages: Edit"
 #   CLOUDFLARE_ACCOUNT_ID : ID da sua conta Cloudflare
-#   VITE_API_URL          : https://api.fidecode.com.br
+#   VITE_API_URL          : https://api.trinusphere.com.br
 # =============================================================================
 image: node:22-alpine
 
@@ -21,7 +21,7 @@ pipelines:
             - node
           script:
             - npm ci
-            - VITE_API_URL=${VITE_API_URL:-https://api.fidecode.com.br} npm run build
+            - VITE_API_URL=${VITE_API_URL:-https://api.trinusphere.com.br} npm run build
             - npx --yes wrangler@latest pages deploy dist --project-name=beebite-front --branch=main
   custom:
     deploy-cloudflare-pages:
@@ -31,6 +31,6 @@ pipelines:
             - node
           script:
             - npm ci
-            - VITE_API_URL=${VITE_API_URL:-https://api.fidecode.com.br} npm run build
+            - VITE_API_URL=${VITE_API_URL:-https://api.trinusphere.com.br} npm run build
             - npx --yes wrangler@latest pages deploy dist --project-name=beebite-front --branch=main
 
