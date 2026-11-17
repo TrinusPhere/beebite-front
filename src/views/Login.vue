@@ -22,7 +22,11 @@ const handleLogin = async () => {
   try {
     const success = await authState.login(form.login, form.password);
     if (success) {
-      router.push("/pedidos"); // Redirecionar para o dashboard após login bem-sucedido
+      if (authState.isSuperAdmin()) {
+        router.push("/platform/overview");
+      } else {
+        router.push("/pedidos");
+      }
     }
   } catch (error) {
     if (error.response && error.response.status === 401) {

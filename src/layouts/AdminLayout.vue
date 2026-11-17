@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import Sidebar from "../components/ui/Sidebar.vue";
 import {
   Bell,
@@ -16,12 +16,15 @@ import {
   HardDrive,
   User,
   Building2,
+  Eye,
+  ShieldAlert,
 } from "lucide-vue-next";
 import { authState } from "../utils/auth";
 import StoreSettingsModal from "../components/StoreSettingsModal.vue";
 import UserProfileModal from "../components/UserProfileModal.vue";
 
 const router = useRouter();
+const route = useRoute();
 const isMobileMenuOpen = ref(false);
 const isStoreSettingsOpen = ref(false);
 const isStoreSwitcherOpen = ref(false);
@@ -29,12 +32,38 @@ const isProfileMenuOpen = ref(false);
 const isNotificationsOpen = ref(false);
 const isUserProfileOpen = ref(false);
 const storeViewKey = ref(0);
+const readOnlyAlertMessage = ref("");
+let alertTimer = null;
+
+const handleReadOnlyBlocked = (event) => {
+  readOnlyAlertMessage.value =
+    event?.detail?.message ||
+    "Ação bloqueada: o Super Administrador possui acesso somente leitura nas lojas dos clientes.";
+  if (alertTimer) clearTimeout(alertTimer);
+  alertTimer = setTimeout(() => {
+    readOnlyAlertMessage.value = "";
+  }, 5000);
+};
 
 onMounted(() => {
   if (authState.currentUser) {
     authState.refreshAccessibleStores();
   }
+  window.addEventListener("beebite:readonly-blocked", handleReadOnlyBlocked);
 });
+
+onUnmounted(() => {
+  window.removeEventListener("beebite:readonly-blocked", handleReadOnlyBlocked);
+  if (alertTimer) clearTimeout(alertTimer);
+});
+
+const isPlatformContext = computed(
+  () => authState.isSuperAdmin() && route.path.startsWith("/platform"),
+);
+
+const isReadOnlyStoreInspection = computed(
+  () => authState.isSuperAdmin() && !route.path.startsWith("/platform"),
+);
 
 const toggleMobileMenu = () => {
   isMobileMenuOpen.value = !isMobileMenuOpen.value;
@@ -87,17 +116,23 @@ const formatSyncTime = (isoTimestamp) => {
 const handleSwitchStore = async (targetStoreId) => {
   isStoreSwitcherOpen.value = false;
   if (authState.currentUser && authState.currentUser.storeId === targetStoreId) {
+    if (isPlatformContext.value) {
+      router.push("/dashboard");
+    }
     return;
   }
   const switched = await authState.switchStore(targetStoreId);
   if (switched) {
     storeViewKey.value += 1;
+    if (isPlatformContext.value) {
+      router.push("/dashboard");
+    }
   }
 };
 
 const openPlatformBackoffice = () => {
   closeAllDropdowns();
-  router.push("/platform");
+  router.push("/platform/overview");
 };
 
 const openMyProfile = () => {
@@ -135,7 +170,7 @@ const handleLogout = () => {
       class="fixed inset-0 z-30"
     ></div>
 
-    <!-- Sidebar: Adaptável -->
+    <!-- Sidebar: Adaptável e Sensível ao Contexto -->
     <div
       :class="[
         'fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:relative md:translate-x-0',
@@ -160,7 +195,7 @@ const handleLogout = () => {
             <X v-else :size="24" />
           </button>
 
-          <!-- Store Switcher Adaptativo: exibe seletor apenas quando o usuário possui > 1 loja vinculada -->
+          <!-- Store Switcher Adaptativo -->
           <div v-if="hasMultipleStores && activeStore" class="relative">
             <button
               @click="
@@ -170,7 +205,7 @@ const handleLogout = () => {
               "
               :disabled="authState.switchingStore"
               class="flex items-center gap-2.5 bg-orange-50/80 hover:bg-orange-100/80 border border-orange-200/80 text-slate-800 px-3 py-1.5 rounded-xl transition-all text-left"
-              title="Alternar unidade sem sair da conta"
+              title="Alternar unidade para visualização ou operação"
             >
               <div
                 class="w-7 h-7 rounded-lg bg-orange-500 text-white flex items-center justify-center shrink-0 shadow-sm"
@@ -209,7 +244,11 @@ const handleLogout = () => {
             >
               <div class="px-3.5 py-1.5 border-b border-slate-100">
                 <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Alternar Unidade ({{ authState.accessibleStores.length }} lojas)
+                  {{
+                    authState.isSuperAdmin()
+                      ? `Visualizar Unidade (${authState.accessibleStores.length} lojas)`
+                      : `Alternar Unidade (${authState.accessibleStores.length} lojas)`
+                  }}
                 </p>
               </div>
               <button
@@ -269,18 +308,20 @@ const handleLogout = () => {
         </div>
 
         <div class="flex items-center gap-2 md:gap-4">
-          <!-- Botão rápido Trinusphere Backoffice (apenas SUPER_ADMIN) -->
+          <!-- Botão rápido Trinusphere Backoffice (apenas SUPER_ADMIN fora de /platform) -->
           <button
-            v-if="authState.isSuperAdmin()"
+            v-if="isReadOnlyStoreInspection"
             @click="openPlatformBackoffice"
             class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-xs font-bold transition-colors"
-            title="Abrir Painel Administrativo Trinusphere SaaS"
+            title="Voltar ao Painel Administrativo Trinusphere SaaS"
           >
             <Building2 :size="15" />
             <span>Painel Trinusphere</span>
           </button>
 
+          <!-- Configurações da Loja (oculto para SUPER_ADMIN em modo leitura) -->
           <button
+            v-if="!authState.isSuperAdmin()"
             @click="openStoreSettings"
             class="p-2 text-slate-400 hover:text-orange-500 transition-colors"
             title="Configurações da Loja"
@@ -395,6 +436,7 @@ const handleLogout = () => {
               </button>
 
               <button
+                v-if="!authState.isSuperAdmin()"
                 @click="openStoreSettings"
                 class="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5"
               >
@@ -416,7 +458,42 @@ const handleLogout = () => {
         </div>
       </header>
 
-      <!-- Conteúdo Principal (recarrega automaticamente ao trocar de loja via storeViewKey) -->
+      <!-- Banner de Modo Somente Leitura (quando SUPER_ADMIN inspeciona uma loja) -->
+      <div
+        v-if="isReadOnlyStoreInspection"
+        class="bg-amber-50 border-b border-amber-200 px-4 md:px-8 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900 z-20"
+      >
+        <div class="flex items-center gap-2 font-medium">
+          <Eye :size="16" class="text-amber-600 shrink-0" />
+          <span>
+            <strong>Modo Auditoria / Suporte (Somente Leitura)</strong> — Visualizando
+            <strong>{{ activeStore?.storeName || "Unidade Selecionada" }}</strong>. O Super
+            Administrador não pode cadastrar, editar ou excluir dados operacionais do cliente.
+          </span>
+        </div>
+        <button
+          @click="openPlatformBackoffice"
+          class="font-bold text-amber-800 hover:text-amber-950 underline shrink-0"
+        >
+          Voltar ao Painel Trinusphere →
+        </button>
+      </div>
+
+      <!-- Toast de bloqueio caso tente salvar em modo somente leitura -->
+      <div
+        v-if="readOnlyAlertMessage"
+        class="bg-red-600 text-white px-4 md:px-8 py-2.5 flex items-center justify-between text-xs font-bold shadow-md z-30"
+      >
+        <div class="flex items-center gap-2">
+          <ShieldAlert :size="16" class="shrink-0" />
+          <span>{{ readOnlyAlertMessage }}</span>
+        </div>
+        <button @click="readOnlyAlertMessage = ''" class="text-white/80 hover:text-white">
+          ✕
+        </button>
+      </div>
+
+      <!-- Conteúdo Principal -->
       <div class="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50/50">
         <router-view v-slot="{ Component }">
           <transition name="page" mode="out-in">

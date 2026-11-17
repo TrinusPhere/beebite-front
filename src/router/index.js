@@ -31,7 +31,10 @@ import InteligenciaFinanceira from "../views/financeiro/InteligenciaFinanceira.v
 import KdsView from "../views/kds/KdsView.vue";
 import KdsSettingsView from "../views/kds/KdsSettingsView.vue";
 import ControleCaixa from "../views/caixa/ControleCaixa.vue";
-import TrinusphereBackoffice from "../views/platform/TrinusphereBackoffice.vue";
+import PlatformOverviewView from "../views/platform/PlatformOverviewView.vue";
+import PlatformTenantsView from "../views/platform/PlatformTenantsView.vue";
+import PlatformContractsView from "../views/platform/PlatformContractsView.vue";
+import PlatformInvoicesView from "../views/platform/PlatformInvoicesView.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -54,8 +57,31 @@ const router = createRouter({
       children: [
         {
           path: "platform",
-          name: "trinusphere-backoffice",
-          component: TrinusphereBackoffice,
+          redirect: "/platform/overview",
+          meta: { requiresSuperAdmin: true },
+        },
+        {
+          path: "platform/overview",
+          name: "platform-overview",
+          component: PlatformOverviewView,
+          meta: { requiresSuperAdmin: true },
+        },
+        {
+          path: "platform/tenants",
+          name: "platform-tenants",
+          component: PlatformTenantsView,
+          meta: { requiresSuperAdmin: true },
+        },
+        {
+          path: "platform/contracts",
+          name: "platform-contracts",
+          component: PlatformContractsView,
+          meta: { requiresSuperAdmin: true },
+        },
+        {
+          path: "platform/invoices",
+          name: "platform-invoices",
+          component: PlatformInvoicesView,
           meta: { requiresSuperAdmin: true },
         },
         {
