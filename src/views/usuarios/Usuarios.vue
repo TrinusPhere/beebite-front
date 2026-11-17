@@ -1,12 +1,14 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { UserPlus, Edit, Trash2, Users } from "lucide-vue-next";
+import { UserPlus, Edit, Trash2, Users, Store } from "lucide-vue-next";
 import BaseButton from "@/components/BaseButton.vue";
 import { userService } from "@/services/userService";
+import { authState } from "@/utils/auth";
 
 const router = useRouter();
 const users = ref([]);
+const actionError = ref("");
 
 const fetchUsers = async () => {
   try {
@@ -16,9 +18,45 @@ const fetchUsers = async () => {
   }
 };
 
-onMounted(() => {
-  fetchUsers();
+onMounted(async () => {
+  if (!authState.accessibleStores?.length && authState.currentUser) {
+    await authState.refreshAccessibleStores();
+  }
+  await fetchUsers();
 });
+
+const storeNameById = computed(() => {
+  const map = {};
+  const stores = Array.isArray(authState.accessibleStores)
+    ? authState.accessibleStores
+    : [];
+  for (const s of stores) {
+    if (s.storeId) {
+      map[s.storeId] = s.storeName;
+    }
+  }
+  return map;
+});
+
+const resolveStoreNames = (user) => {
+  const ids =
+    Array.isArray(user.storeIds) && user.storeIds.length > 0
+      ? user.storeIds
+      : user.storeId
+        ? [user.storeId]
+        : [];
+  return ids.map((id) => storeNameById.value[id] || id);
+};
+
+const canManageUser = (targetUser) => {
+  if (!targetUser) return false;
+  if (targetUser.role === "SUPER_ADMIN") return false;
+  const callerRole = authState.currentUser?.role;
+  if (callerRole === "GERENTE" && targetUser.role === "ADMIN") {
+    return false;
+  }
+  return true;
+};
 
 const goToAddUser = () => {
   router.push("/usuarios/novo");
@@ -29,15 +67,28 @@ const goToEditUser = (user) => {
 };
 
 const deleteUser = async (userId) => {
-  if (confirm("Tem certeza que deseja excluir este usuário?")) {
+  actionError.value = "";
+  if (
+    confirm(
+      "Tem certeza que deseja excluir este usuário? (Para remover o acesso apenas de uma loja, use Editar.)",
+    )
+  ) {
     try {
       await userService.delete(userId);
-      await fetchUsers(); // Atualiza a lista
+      await fetchUsers();
     } catch (error) {
       console.error("Erro ao excluir usuário", error);
-      alert("Erro ao excluir usuário.");
+      actionError.value =
+        error.response?.data?.message || "Erro ao excluir usuário.";
     }
   }
+};
+
+const roleLabels = {
+  SUPER_ADMIN: "Super Admin",
+  ADMIN: "Administrador",
+  GERENTE: "Gerente",
+  CAIXA: "Caixa / Operador",
 };
 
 const permissionLabels = {
@@ -56,6 +107,7 @@ const permissionLabels = {
 };
 
 const getPermissionLabel = (perm) => permissionLabels[perm] || perm;
+const getRoleLabel = (role) => roleLabels[role] || role;
 </script>
 
 <template>
@@ -69,7 +121,7 @@ const getPermissionLabel = (perm) => permissionLabels[perm] || perm;
           Gestão de Usuários 👥
         </h1>
         <p class="text-slate-500 text-sm font-medium">
-          Cadastre e gerencie os usuários do sistema.
+          Cadastre operadores, caixas e gerentes com acesso às suas lojas.
         </p>
       </div>
       <BaseButton
@@ -80,6 +132,13 @@ const getPermissionLabel = (perm) => permissionLabels[perm] || perm;
         <UserPlus :size="20" />
         Novo Usuário
       </BaseButton>
+    </div>
+
+    <div
+      v-if="actionError"
+      class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm font-semibold"
+    >
+      {{ actionError }}
     </div>
 
     <!-- Lista de Usuários -->
@@ -94,10 +153,10 @@ const getPermissionLabel = (perm) => permissionLabels[perm] || perm;
           <h3
             class="font-black text-slate-800 text-sm uppercase tracking-widest"
           >
-            Usuários Cadastrados
+            Usuários da Unidade
           </h3>
           <p class="text-xs text-slate-400 font-medium mt-0.5">
-            Lista de todos os usuários com acesso ao sistema.
+            Colaboradores com acesso ativo a esta unidade.
           </p>
         </div>
       </div>
@@ -119,7 +178,12 @@ const getPermissionLabel = (perm) => permissionLabels[perm] || perm;
               <th
                 class="p-4 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100"
               >
-                Cargo/Role
+                Cargo / Perfil
+              </th>
+              <th
+                class="p-4 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100"
+              >
+                Lojas
               </th>
               <th
                 class="p-4 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100"
@@ -142,15 +206,36 @@ const getPermissionLabel = (perm) => permissionLabels[perm] || perm;
               <td class="p-4 font-bold text-slate-800 text-sm">
                 {{ user.name }}
               </td>
-              <td class="p-4 font-medium text-slate-600 text-sm">
+              <td class="p-4 font-medium text-slate-600 text-sm font-mono">
                 {{ user.login }}
               </td>
               <td class="p-4 font-medium text-slate-600 text-sm">
-                {{ user.role }}
+                <span
+                  :class="[
+                    'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border',
+                    user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
+                      ? 'bg-orange-50 text-orange-700 border-orange-200'
+                      : user.role === 'GERENTE'
+                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                        : 'bg-slate-100 text-slate-700 border-slate-200',
+                  ]"
+                >
+                  {{ getRoleLabel(user.role) }}
+                </span>
+              </td>
+              <td class="p-4 text-xs max-w-[200px]">
+                <span
+                  v-for="storeName in resolveStoreNames(user)"
+                  :key="storeName"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 mr-1 mb-1"
+                >
+                  <Store :size="11" />
+                  {{ storeName }}
+                </span>
               </td>
               <td class="p-4 text-sm max-w-xs">
                 <span
-                  v-if="user.role === 'ADMIN'"
+                  v-if="user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'"
                   class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200"
                 >
                   ⚡ Acesso Total (Admin)
@@ -172,7 +257,7 @@ const getPermissionLabel = (perm) => permissionLabels[perm] || perm;
                 </template>
               </td>
               <td class="p-4 text-right">
-                <div class="flex justify-end gap-2">
+                <div v-if="canManageUser(user)" class="flex justify-end gap-2">
                   <BaseButton
                     @click="goToEditUser(user)"
                     variant="ghost"
@@ -189,11 +274,14 @@ const getPermissionLabel = (perm) => permissionLabels[perm] || perm;
                     <Trash2 :size="16" />
                   </BaseButton>
                 </div>
+                <span v-else class="text-[11px] text-slate-400 font-medium">
+                  Protegido
+                </span>
               </td>
             </tr>
             <tr v-if="users.length === 0">
               <td
-                colspan="5"
+                colspan="6"
                 class="p-8 text-center text-slate-400 font-medium text-sm"
               >
                 Nenhum usuário cadastrado.

@@ -442,11 +442,24 @@ const copyEnvSnippet = async () => {
               <div class="flex items-center gap-2">
                 <button
                   @click="visualizeStoreReadOnly(store.id)"
-                  class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition-colors"
-                  title="Abrir painel da loja em modo visualização (Somente Leitura)"
+                  :class="[
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-colors',
+                    tenant.id === '00000000-0000-0000-0000-000000000001'
+                      ? 'bg-indigo-600 hover:bg-indigo-700'
+                      : 'bg-slate-900 hover:bg-slate-800',
+                  ]"
+                  :title="
+                    tenant.id === '00000000-0000-0000-0000-000000000001'
+                      ? 'Operar Loja Beta / Sandbox da Trinusphere em PRD'
+                      : 'Abrir painel da loja em modo visualização (Somente Leitura)'
+                  "
                 >
                   <Eye :size="13" />
-                  <span>Visualizar Loja</span>
+                  <span>{{
+                    tenant.id === "00000000-0000-0000-0000-000000000001"
+                      ? "Operar Loja Beta"
+                      : "Visualizar Loja"
+                  }}</span>
                 </button>
                 <button
                   @click="openEditStore(store)"

@@ -61,8 +61,20 @@ const isPlatformContext = computed(
   () => authState.isSuperAdmin() && route.path.startsWith("/platform"),
 );
 
-const isReadOnlyStoreInspection = computed(
+const isSandboxBetaStore = computed(() =>
+  Boolean(
+    activeStore.value &&
+      (activeStore.value.sandboxBeta ||
+        activeStore.value.tenantId === "00000000-0000-0000-0000-000000000001"),
+  ),
+);
+
+const isSuperAdminInsideStore = computed(
   () => authState.isSuperAdmin() && !route.path.startsWith("/platform"),
+);
+
+const isReadOnlyStoreInspection = computed(
+  () => isSuperAdminInsideStore.value && !isSandboxBetaStore.value,
 );
 
 const toggleMobileMenu = () => {
@@ -310,7 +322,7 @@ const handleLogout = () => {
         <div class="flex items-center gap-2 md:gap-4">
           <!-- Botão rápido Trinusphere Backoffice (apenas SUPER_ADMIN fora de /platform) -->
           <button
-            v-if="isReadOnlyStoreInspection"
+            v-if="isSuperAdminInsideStore"
             @click="openPlatformBackoffice"
             class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-xs font-bold transition-colors"
             title="Voltar ao Painel Administrativo Trinusphere SaaS"
@@ -319,9 +331,9 @@ const handleLogout = () => {
             <span>Painel Trinusphere</span>
           </button>
 
-          <!-- Configurações da Loja (oculto para SUPER_ADMIN em modo leitura) -->
+          <!-- Configurações da Loja (oculto apenas quando SUPER_ADMIN inspeciona loja de cliente) -->
           <button
-            v-if="!authState.isSuperAdmin()"
+            v-if="!isReadOnlyStoreInspection"
             @click="openStoreSettings"
             class="p-2 text-slate-400 hover:text-orange-500 transition-colors"
             title="Configurações da Loja"
@@ -436,7 +448,7 @@ const handleLogout = () => {
               </button>
 
               <button
-                v-if="!authState.isSuperAdmin()"
+                v-if="!isReadOnlyStoreInspection"
                 @click="openStoreSettings"
                 class="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5"
               >
@@ -458,7 +470,27 @@ const handleLogout = () => {
         </div>
       </header>
 
-      <!-- Banner de Modo Somente Leitura (quando SUPER_ADMIN inspeciona uma loja) -->
+      <!-- Banner de Loja Beta da Trinusphere (escrita liberada para testes em PRD) -->
+      <div
+        v-if="isSuperAdminInsideStore && isSandboxBetaStore"
+        class="bg-indigo-50 border-b border-indigo-200 px-4 md:px-8 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-indigo-900 z-20"
+      >
+        <div class="flex items-center gap-2 font-medium">
+          <span>🧪</span>
+          <span>
+            <strong>Loja Beta / Testes Trinusphere</strong> — Você está operando
+            <strong>{{ activeStore?.storeName || "Loja Beta" }}</strong> (pertence à Trinusphere). Criação e edição liberadas para validação em PRD.
+          </span>
+        </div>
+        <button
+          @click="openPlatformBackoffice"
+          class="font-bold text-indigo-800 hover:text-indigo-950 underline shrink-0"
+        >
+          Voltar ao Painel Trinusphere →
+        </button>
+      </div>
+
+      <!-- Banner de Modo Somente Leitura (quando SUPER_ADMIN inspeciona loja de CLIENTE) -->
       <div
         v-if="isReadOnlyStoreInspection"
         class="bg-amber-50 border-b border-amber-200 px-4 md:px-8 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900 z-20"

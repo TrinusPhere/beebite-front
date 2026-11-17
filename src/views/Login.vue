@@ -31,6 +31,10 @@ const handleLogin = async () => {
   } catch (error) {
     if (error.response && error.response.status === 401) {
       errorMessage.value = "Usuário ou senha incorretos. Tente novamente.";
+    } else if (error.response && error.response.status === 403) {
+      errorMessage.value =
+        error.response?.data?.message ||
+        "Acesso bloqueado: unidade suspensa ou inativa.";
     } else {
       errorMessage.value =
         "Erro ao conectar com o servidor. Tente novamente mais tarde.";
