@@ -116,9 +116,18 @@ export const authState = reactive({
     authService.logout();
   },
 
+  isSuperAdmin() {
+    return Boolean(this.currentUser && this.currentUser.role === "SUPER_ADMIN");
+  },
+
   hasPermission(permission) {
     if (!this.currentUser) return false;
-    if (this.currentUser.role === "ADMIN") return true;
+    if (
+      this.currentUser.role === "SUPER_ADMIN" ||
+      this.currentUser.role === "ADMIN"
+    ) {
+      return true;
+    }
     return (
       this.currentUser.permissions &&
       this.currentUser.permissions.includes(permission)

@@ -23,6 +23,7 @@ import {
   Flame,
   Monitor,
   Wallet,
+  Building2,
 } from "lucide-vue-next";
 import { authState } from "@/utils/auth";
 import BeeBiteLogo from "./BeeBiteLogo.vue";
@@ -185,6 +186,33 @@ const handleLogout = () => {
 
     <!-- Navigation -->
     <nav class="flex-1 px-4 space-y-1.5 mt-4 overflow-y-auto">
+      <!-- Seção Exclusiva Trinusphere Backoffice (visível apenas para SUPER_ADMIN) -->
+      <div
+        v-if="authState.isSuperAdmin()"
+        class="mb-3 pb-3 border-b border-slate-100"
+      >
+        <p
+          v-if="!isCollapsed"
+          class="px-4 pb-1.5 text-[10px] font-black uppercase tracking-wider text-orange-600"
+        >
+          Trinusphere SaaS
+        </p>
+        <button
+          @click="navigate('/platform')"
+          :class="[
+            'w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 group relative',
+            route.path === '/platform'
+              ? 'bg-orange-500 text-white font-bold shadow-md shadow-orange-500/20'
+              : 'bg-orange-50/70 text-orange-700 hover:bg-orange-100/80 font-semibold',
+          ]"
+        >
+          <Building2 :size="22" />
+          <span v-if="!isCollapsed" class="text-sm tracking-wide">
+            Clientes & Contratos
+          </span>
+        </button>
+      </div>
+
       <template v-for="item in menuItems" :key="item.path">
         <button
           v-if="authState.hasPermission(item.permission)"

@@ -31,6 +31,7 @@ import InteligenciaFinanceira from "../views/financeiro/InteligenciaFinanceira.v
 import KdsView from "../views/kds/KdsView.vue";
 import KdsSettingsView from "../views/kds/KdsSettingsView.vue";
 import ControleCaixa from "../views/caixa/ControleCaixa.vue";
+import TrinusphereBackoffice from "../views/platform/TrinusphereBackoffice.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -51,6 +52,12 @@ const router = createRouter({
       component: AdminLayout,
       meta: { requiresAuth: true },
       children: [
+        {
+          path: "platform",
+          name: "trinusphere-backoffice",
+          component: TrinusphereBackoffice,
+          meta: { requiresSuperAdmin: true },
+        },
         {
           path: "dashboard",
           name: "dashboard",
@@ -265,6 +272,7 @@ router.beforeEach((to, from, next) => {
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
   const isPublic = to.matched.some((record) => record.meta.public); // Verifica se é uma rota pública
   const requiredPermission = to.meta.requiresPermission;
+  const requiresSuperAdmin = to.meta.requiresSuperAdmin;
 
   console.log("--- Navigation Guard ---");
   console.log(
@@ -286,6 +294,8 @@ router.beforeEach((to, from, next) => {
 
   if (requiresAuth && !authState.currentUser) {
     next({ name: "login" });
+  } else if (requiresSuperAdmin && !authState.isSuperAdmin()) {
+    next({ name: "dashboard" });
   } else if (
     requiredPermission &&
     !authState.hasPermission(requiredPermission)
