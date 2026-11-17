@@ -116,6 +116,18 @@ export const authState = reactive({
     authService.logout();
   },
 
+  async updateProfile(payload) {
+    const updated = await authService.updateProfile(payload);
+    if (updated && this.currentUser) {
+      this.currentUser = {
+        ...this.currentUser,
+        name: updated.name || this.currentUser.name,
+      };
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(this.currentUser));
+    }
+    return updated;
+  },
+
   isSuperAdmin() {
     return Boolean(this.currentUser && this.currentUser.role === "SUPER_ADMIN");
   },

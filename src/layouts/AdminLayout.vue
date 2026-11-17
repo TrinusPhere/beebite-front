@@ -14,14 +14,20 @@ import {
   Check,
   Cloud,
   HardDrive,
+  User,
+  Building2,
 } from "lucide-vue-next";
 import { authState } from "../utils/auth";
 import StoreSettingsModal from "../components/StoreSettingsModal.vue";
+import UserProfileModal from "../components/UserProfileModal.vue";
 
 const router = useRouter();
 const isMobileMenuOpen = ref(false);
 const isStoreSettingsOpen = ref(false);
 const isStoreSwitcherOpen = ref(false);
+const isProfileMenuOpen = ref(false);
+const isNotificationsOpen = ref(false);
+const isUserProfileOpen = ref(false);
 const storeViewKey = ref(0);
 
 onMounted(() => {
@@ -32,6 +38,12 @@ onMounted(() => {
 
 const toggleMobileMenu = () => {
   isMobileMenuOpen.value = !isMobileMenuOpen.value;
+};
+
+const closeAllDropdowns = () => {
+  isStoreSwitcherOpen.value = false;
+  isProfileMenuOpen.value = false;
+  isNotificationsOpen.value = false;
 };
 
 const userName = computed(() =>
@@ -83,7 +95,23 @@ const handleSwitchStore = async (targetStoreId) => {
   }
 };
 
+const openPlatformBackoffice = () => {
+  closeAllDropdowns();
+  router.push("/platform");
+};
+
+const openMyProfile = () => {
+  closeAllDropdowns();
+  isUserProfileOpen.value = true;
+};
+
+const openStoreSettings = () => {
+  closeAllDropdowns();
+  isStoreSettingsOpen.value = true;
+};
+
 const handleLogout = () => {
+  closeAllDropdowns();
   authState.logout();
   router.push("/");
 };
@@ -100,10 +128,10 @@ const handleLogout = () => {
       class="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 md:hidden"
     ></div>
 
-    <!-- Overlay invisível para fechar o dropdown de lojas -->
+    <!-- Overlay invisível para fechar os dropdowns da navbar -->
     <div
-      v-if="isStoreSwitcherOpen"
-      @click="isStoreSwitcherOpen = false"
+      v-if="isStoreSwitcherOpen || isProfileMenuOpen || isNotificationsOpen"
+      @click="closeAllDropdowns"
       class="fixed inset-0 z-30"
     ></div>
 
@@ -135,7 +163,11 @@ const handleLogout = () => {
           <!-- Store Switcher Adaptativo: exibe seletor apenas quando o usuário possui > 1 loja vinculada -->
           <div v-if="hasMultipleStores && activeStore" class="relative">
             <button
-              @click="isStoreSwitcherOpen = !isStoreSwitcherOpen"
+              @click="
+                isProfileMenuOpen = false;
+                isNotificationsOpen = false;
+                isStoreSwitcherOpen = !isStoreSwitcherOpen;
+              "
               :disabled="authState.switchingStore"
               class="flex items-center gap-2.5 bg-orange-50/80 hover:bg-orange-100/80 border border-orange-200/80 text-slate-800 px-3 py-1.5 rounded-xl transition-all text-left"
               title="Alternar unidade sem sair da conta"
@@ -236,47 +268,150 @@ const handleLogout = () => {
           </div>
         </div>
 
-        <div class="flex items-center gap-2 md:gap-6">
+        <div class="flex items-center gap-2 md:gap-4">
+          <!-- Botão rápido Trinusphere Backoffice (apenas SUPER_ADMIN) -->
           <button
-            @click="isStoreSettingsOpen = true"
+            v-if="authState.isSuperAdmin()"
+            @click="openPlatformBackoffice"
+            class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-xs font-bold transition-colors"
+            title="Abrir Painel Administrativo Trinusphere SaaS"
+          >
+            <Building2 :size="15" />
+            <span>Painel Trinusphere</span>
+          </button>
+
+          <button
+            @click="openStoreSettings"
             class="p-2 text-slate-400 hover:text-orange-500 transition-colors"
             title="Configurações da Loja"
           >
             <Settings :size="20" />
           </button>
 
-          <button
-            class="p-2 text-slate-400 hover:text-orange-500 transition-colors relative"
-          >
-            <Bell :size="20" />
-            <span
-              class="absolute top-2 right-2 w-2 h-2 bg-orange-500 rounded-full border-2 border-white"
-            ></span>
-          </button>
-
-          <div
-            class="flex items-center gap-3 pl-4 md:pl-6 border-l border-slate-200"
-          >
-            <div class="text-right hidden lg:block">
-              <p class="text-xs font-bold text-slate-800">{{ userName }}</p>
-              <p
-                class="text-[10px] text-slate-400 uppercase tracking-widest font-semibold"
-              >
-                {{ userRole }}
-              </p>
-            </div>
-            <div
-              class="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-tr from-orange-500 to-amber-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md shadow-orange-500/20"
-            >
-              {{ userName.substring(0, 2).toUpperCase() }}
-            </div>
+          <!-- Notificações -->
+          <div class="relative">
             <button
-              @click="handleLogout"
-              class="p-2 text-slate-400 hover:text-red-500 transition-colors"
-              title="Sair"
+              @click="
+                isProfileMenuOpen = false;
+                isStoreSwitcherOpen = false;
+                isNotificationsOpen = !isNotificationsOpen;
+              "
+              class="p-2 text-slate-400 hover:text-orange-500 transition-colors relative"
+              title="Notificações e Status"
             >
-              <LogOut :size="20" />
+              <Bell :size="20" />
+              <span
+                class="absolute top-2 right-2 w-2 h-2 bg-orange-500 rounded-full border-2 border-white"
+              ></span>
             </button>
+
+            <div
+              v-if="isNotificationsOpen"
+              class="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl py-2 z-50"
+            >
+              <div class="px-4 py-2 border-b border-slate-100">
+                <p class="text-xs font-bold text-slate-800">Status do Sistema</p>
+              </div>
+              <div class="px-4 py-3 text-xs text-slate-600 space-y-2">
+                <p class="flex items-center justify-between">
+                  <span>API Nuvem:</span>
+                  <span class="font-bold text-emerald-600">● Online</span>
+                </p>
+                <p v-if="activeStore" class="flex items-center justify-between">
+                  <span>Unidade Ativa:</span>
+                  <span class="font-bold text-slate-800 truncate max-w-[140px]">{{
+                    activeStore.storeName
+                  }}</span>
+                </p>
+                <button
+                  v-if="authState.isSuperAdmin()"
+                  @click="openPlatformBackoffice"
+                  class="w-full mt-1 py-1.5 rounded-lg bg-orange-50 text-orange-700 font-bold hover:bg-orange-100 transition-colors"
+                >
+                  Ir para Trinusphere SaaS →
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Menu Interativo do Usuário / Perfil -->
+          <div class="relative pl-3 md:pl-4 border-l border-slate-200">
+            <button
+              @click="
+                isNotificationsOpen = false;
+                isStoreSwitcherOpen = false;
+                isProfileMenuOpen = !isProfileMenuOpen;
+              "
+              class="flex items-center gap-2.5 hover:bg-slate-50 px-2 py-1 rounded-xl transition-colors text-left"
+              title="Abrir opções de perfil e conta"
+            >
+              <div class="text-right hidden lg:block">
+                <p class="text-xs font-bold text-slate-800">{{ userName }}</p>
+                <p
+                  class="text-[10px] text-slate-400 uppercase tracking-widest font-semibold"
+                >
+                  {{ userRole }}
+                </p>
+              </div>
+              <div
+                class="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-tr from-orange-500 to-amber-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md shadow-orange-500/20"
+              >
+                {{ userName.substring(0, 2).toUpperCase() }}
+              </div>
+              <ChevronDown
+                :size="15"
+                class="text-slate-400 hidden sm:block transition-transform duration-200"
+                :class="{ 'rotate-180': isProfileMenuOpen }"
+              />
+            </button>
+
+            <!-- Dropdown do Perfil -->
+            <div
+              v-if="isProfileMenuOpen"
+              class="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl py-2 z-50"
+            >
+              <div class="px-4 py-2.5 border-b border-slate-100">
+                <p class="text-xs font-bold text-slate-900 truncate">{{ userName }}</p>
+                <p class="text-[11px] text-slate-500 truncate">
+                  {{ authState.currentUser?.login }} · {{ userRole }}
+                </p>
+              </div>
+
+              <button
+                @click="openMyProfile"
+                class="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5"
+              >
+                <User :size="16" class="text-slate-400" />
+                <span>Meu Perfil & Alterar Senha</span>
+              </button>
+
+              <button
+                v-if="authState.isSuperAdmin()"
+                @click="openPlatformBackoffice"
+                class="w-full px-4 py-2.5 text-left text-xs font-bold text-orange-600 hover:bg-orange-50 flex items-center gap-2.5"
+              >
+                <Building2 :size="16" />
+                <span>Trinusphere Backoffice (SaaS)</span>
+              </button>
+
+              <button
+                @click="openStoreSettings"
+                class="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5"
+              >
+                <Settings :size="16" class="text-slate-400" />
+                <span>Configurações da Loja</span>
+              </button>
+
+              <div class="my-1 border-t border-slate-100"></div>
+
+              <button
+                @click="handleLogout"
+                class="w-full px-4 py-2.5 text-left text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2.5"
+              >
+                <LogOut :size="16" />
+                <span>Sair da Conta</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -296,6 +431,11 @@ const handleLogout = () => {
     <StoreSettingsModal
       v-if="isStoreSettingsOpen"
       @close="isStoreSettingsOpen = false"
+    />
+
+    <UserProfileModal
+      v-if="isUserProfileOpen"
+      @close="isUserProfileOpen = false"
     />
   </div>
 </template>
