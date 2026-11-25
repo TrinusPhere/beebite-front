@@ -272,7 +272,7 @@ const handleRegenerateToken = async () => {
 };
 
 const copyEnvSnippet = async () => {
-  const snippet = `STORE_ID=${edgeStoreInfo.value.storeId}\nBITEFLOW_SYNC_MODE=EDGE\nCLOUD_SYNC_URL=https://api.trinusphere.com\nEDGE_DEVICE_TOKEN=${edgeStoreInfo.value.token}`;
+  const snippet = `STORE_ID=${edgeStoreInfo.value.storeId}\nBEEBITE_SYNC_MODE=EDGE\nCLOUD_SYNC_URL=https://api.trinusphere.com\nEDGE_DEVICE_TOKEN=${edgeStoreInfo.value.token}`;
   try {
     await navigator.clipboard.writeText(snippet);
   } catch {
@@ -637,7 +637,7 @@ const copyEnvSnippet = async () => {
         </div>
         <h3 class="text-base font-black text-slate-900">{{ edgeStoreInfo.storeName }}</h3>
         <pre class="p-4 rounded-xl bg-slate-900 text-sky-300 text-xs font-mono overflow-x-auto">STORE_ID={{ edgeStoreInfo.storeId }}
-BITEFLOW_SYNC_MODE=EDGE
+BEEBITE_SYNC_MODE=EDGE
 CLOUD_SYNC_URL=https://api.trinusphere.com
 EDGE_DEVICE_TOKEN={{ edgeStoreInfo.token }}</pre>
         <div class="flex flex-wrap items-center justify-between gap-2 pt-2">

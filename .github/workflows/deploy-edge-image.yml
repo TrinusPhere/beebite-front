@@ -1,0 +1,53 @@
+# =============================================================================
+# GitHub Actions — beebite-front (Imagem Docker Edge / Nginx -> Artifact Registry)
+# =============================================================================
+# Observacao:
+#   - O deploy da Nuvem (https://beebite.trinusphere.com) continua via Cloudflare Pages.
+#   - Este workflow publica a imagem Docker leve (Nginx + SPA com /api relativo)
+#     para instalacao nas maquinas de bancada (Edge / Offline-First).
+#
+# Secrets necessarios em Settings -> Secrets and variables -> Actions:
+#   Secret:
+#     GCP_SA_KEY_BASE64 : (mesma chave JSON em base64 usada no beebite-backend)
+#   Variables (opcionais, ja possuem default):
+#     GCP_PROJECT_ID    : trinusphere-beebite-prd
+#     GCP_REGION        : us-east1
+# =============================================================================
+name: Build & Push Edge Docker Image (GCP Artifact Registry)
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-push-edge:
+    name: Build Nginx SPA & Push to Artifact Registry
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate GCP_SA_KEY_BASE64 secret
+        env:
+          GCP_SA_KEY_BASE64: ${{ secrets.GCP_SA_KEY_BASE64 }}
+        run: |
+          if [ -z "$GCP_SA_KEY_BASE64" ]; then
+            echo "::error::Secret GCP_SA_KEY_BASE64 nao configurado em Settings -> Secrets and variables -> Actions do repositorio beebite-front."
+            exit 1
+          fi
+
+      - name: Login to Google Artifact Registry
+        run: |
+          echo "${{ secrets.GCP_SA_KEY_BASE64 }}" | base64 -d | docker login -u _json_key --password-stdin https://${{ vars.GCP_REGION || 'us-east1' }}-docker.pkg.dev
+
+      - name: Build & Push Edge Frontend Docker Image
+        run: |
+          IMAGE_URI="${{ vars.GCP_REGION || 'us-east1' }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID || 'trinusphere-beebite-prd' }}/beebite-repo/beebite-front"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          docker build -f Dockerfile -t "${IMAGE_URI}:${SHORT_SHA}" -t "${IMAGE_URI}:latest" .
+          docker push "${IMAGE_URI}:${SHORT_SHA}"
+          docker push "${IMAGE_URI}:latest"
+
