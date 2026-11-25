@@ -274,6 +274,8 @@ export function buildWindowsEdgeInstallerBat({
     "    image: postgres:17-alpine",
     "    container_name: beebite-postgres-edge",
     "    restart: unless-stopped",
+    "    ports:",
+    '      - "127.0.0.1:5435:5432"',
     "    environment:",
     "      POSTGRES_DB: beebite_edge",
     "      POSTGRES_USER: beebite",
