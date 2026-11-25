@@ -71,6 +71,7 @@ const edgeStoreInfo = ref({
   storeName: "",
   publicSlug: "",
   address: "",
+  ownerLogin: "",
   token: "",
 });
 const copiedEnvFeedback = ref(false);
@@ -125,6 +126,9 @@ const handleOnboarded = async (result) => {
       edgeStore.storeId,
       edgeStore.storeName,
       edgeStore.generatedEdgeDeviceToken,
+      "",
+      "",
+      result.ownerLogin || "admin",
     );
   }
 };
@@ -198,6 +202,9 @@ const submitAddStore = async () => {
         created.storeId,
         created.storeName,
         created.generatedEdgeDeviceToken,
+        addStoreForm.value.publicSlug || "",
+        addStoreForm.value.address || "",
+        addStoreForm.value.ownerLoginToLink || "admin",
       );
     }
   } catch (err) {
@@ -258,13 +265,21 @@ const visualizeStoreReadOnly = async (storeId) => {
   }
 };
 
-const openEdgeTokenModal = (storeId, storeName, token, publicSlug = "", address = "") => {
+const openEdgeTokenModal = (
+  storeId,
+  storeName,
+  token,
+  publicSlug = "",
+  address = "",
+  ownerLogin = "",
+) => {
   copiedEnvFeedback.value = false;
   edgeStoreInfo.value = {
     storeId,
     storeName,
     publicSlug: publicSlug || "",
     address: address || "",
+    ownerLogin: ownerLogin || "",
     token: token || "Token ainda não gerado",
   };
   showEdgeTokenModal.value = true;
@@ -286,6 +301,7 @@ const handleDownloadWindowsInstaller = () => {
     storeName: edgeStoreInfo.value.storeName,
     publicSlug: edgeStoreInfo.value.publicSlug,
     address: edgeStoreInfo.value.address,
+    adminLogin: edgeStoreInfo.value.ownerLogin || "admin",
     token: edgeStoreInfo.value.token,
   });
 };
@@ -301,7 +317,17 @@ const handleRegenerateToken = async () => {
 };
 
 const copyEnvSnippet = async () => {
-  const snippet = `STORE_ID=${edgeStoreInfo.value.storeId}\nBEEBITE_SYNC_MODE=EDGE\nCLOUD_SYNC_URL=https://api.trinusphere.com\nEDGE_DEVICE_TOKEN=${edgeStoreInfo.value.token}`;
+  const snippet = [
+    `BEEBITE_EDGE_STORE_ID=${edgeStoreInfo.value.storeId}`,
+    `BEEBITE_EDGE_STORE_NAME=${edgeStoreInfo.value.storeName}`,
+    edgeStoreInfo.value.publicSlug ? `BEEBITE_EDGE_STORE_SLUG=${edgeStoreInfo.value.publicSlug}` : null,
+    `BEEBITE_EDGE_ADMIN_LOGIN=${edgeStoreInfo.value.ownerLogin || "admin"}`,
+    `BEEBITE_SYNC_MODE=EDGE`,
+    `CLOUD_SYNC_URL=https://api.trinusphere.com`,
+    `EDGE_DEVICE_TOKEN=${edgeStoreInfo.value.token}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
   try {
     await navigator.clipboard.writeText(snippet);
     copiedEnvFeedback.value = true;
@@ -505,7 +531,7 @@ const copyEnvSnippet = async () => {
 
               <button
                 v-if="store.syncMode === 'EDGE'"
-                @click="openEdgeTokenModal(store.id, store.name, store.edgeDeviceToken, store.publicSlug, store.address)"
+                @click="openEdgeTokenModal(store.id, store.name, store.edgeDeviceToken, store.publicSlug, store.address, tenant.ownerLogin)"
                 class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100"
               >
                 <KeyRound :size="13" />
@@ -669,7 +695,9 @@ const copyEnvSnippet = async () => {
           ✅ Kit de Implantação Local (Edge Offline-First)
         </div>
         <h3 class="text-base font-black text-slate-900">{{ edgeStoreInfo.storeName }}</h3>
-        <pre class="p-4 rounded-xl bg-slate-900 text-sky-300 text-xs font-mono overflow-x-auto">STORE_ID={{ edgeStoreInfo.storeId }}
+        <pre class="p-4 rounded-xl bg-slate-900 text-sky-300 text-xs font-mono overflow-x-auto">BEEBITE_EDGE_STORE_ID={{ edgeStoreInfo.storeId }}
+BEEBITE_EDGE_STORE_NAME={{ edgeStoreInfo.storeName }}
+BEEBITE_EDGE_ADMIN_LOGIN={{ edgeStoreInfo.ownerLogin || "admin" }}
 BEEBITE_SYNC_MODE=EDGE
 CLOUD_SYNC_URL=https://api.trinusphere.com
 EDGE_DEVICE_TOKEN={{ edgeStoreInfo.token }}</pre>
