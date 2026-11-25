@@ -12,11 +12,14 @@ import {
   PauseCircle,
   PlayCircle,
   Copy,
+  Download,
+  Check,
   RefreshCw,
   KeyRound,
 } from "lucide-vue-next";
 import { platformService } from "@/services/platformService";
 import { authState } from "@/utils/auth";
+import { downloadWindowsEdgeInstaller } from "@/utils/edgeInstallerGenerator";
 import OnboardingClientModal from "@/components/platform/OnboardingClientModal.vue";
 
 const router = useRouter();
@@ -66,8 +69,11 @@ const editStoreForm = ref({
 const edgeStoreInfo = ref({
   storeId: "",
   storeName: "",
+  publicSlug: "",
+  address: "",
   token: "",
 });
+const copiedEnvFeedback = ref(false);
 
 const formatCurrency = (val) =>
   Number(val || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -252,13 +258,36 @@ const visualizeStoreReadOnly = async (storeId) => {
   }
 };
 
-const openEdgeTokenModal = (storeId, storeName, token) => {
+const openEdgeTokenModal = (storeId, storeName, token, publicSlug = "", address = "") => {
+  copiedEnvFeedback.value = false;
   edgeStoreInfo.value = {
     storeId,
     storeName,
+    publicSlug: publicSlug || "",
+    address: address || "",
     token: token || "Token ainda não gerado",
   };
   showEdgeTokenModal.value = true;
+};
+
+const hasValidEdgeToken = computed(
+  () =>
+    Boolean(edgeStoreInfo.value.token) &&
+    edgeStoreInfo.value.token !== "Token ainda não gerado",
+);
+
+const handleDownloadWindowsInstaller = () => {
+  if (!hasValidEdgeToken.value) {
+    errorMsg.value = "Gere ou rotacione o Token Edge antes de baixar o instalador.";
+    return;
+  }
+  downloadWindowsEdgeInstaller({
+    storeId: edgeStoreInfo.value.storeId,
+    storeName: edgeStoreInfo.value.storeName,
+    publicSlug: edgeStoreInfo.value.publicSlug,
+    address: edgeStoreInfo.value.address,
+    token: edgeStoreInfo.value.token,
+  });
 };
 
 const handleRegenerateToken = async () => {
@@ -275,6 +304,10 @@ const copyEnvSnippet = async () => {
   const snippet = `STORE_ID=${edgeStoreInfo.value.storeId}\nBEEBITE_SYNC_MODE=EDGE\nCLOUD_SYNC_URL=https://api.trinusphere.com\nEDGE_DEVICE_TOKEN=${edgeStoreInfo.value.token}`;
   try {
     await navigator.clipboard.writeText(snippet);
+    copiedEnvFeedback.value = true;
+    setTimeout(() => {
+      copiedEnvFeedback.value = false;
+    }, 2500);
   } catch {
     // ignore clipboard errors
   }
@@ -472,11 +505,11 @@ const copyEnvSnippet = async () => {
 
               <button
                 v-if="store.syncMode === 'EDGE'"
-                @click="openEdgeTokenModal(store.id, store.name, store.edgeDeviceToken)"
+                @click="openEdgeTokenModal(store.id, store.name, store.edgeDeviceToken, store.publicSlug, store.address)"
                 class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100"
               >
                 <KeyRound :size="13" />
-                <span>Token Edge</span>
+                <span>Kit Edge / Instalador</span>
               </button>
             </div>
           </div>
@@ -640,14 +673,29 @@ const copyEnvSnippet = async () => {
 BEEBITE_SYNC_MODE=EDGE
 CLOUD_SYNC_URL=https://api.trinusphere.com
 EDGE_DEVICE_TOKEN={{ edgeStoreInfo.token }}</pre>
+        <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-2">
+          <div class="font-bold">⚡ Instalação 1-Clique no Windows do Cliente</div>
+          <p class="text-[11px] leading-relaxed text-emerald-800">
+            Baixe o instalador já preenchido com o <strong>STORE_ID</strong> e o <strong>Token</strong> desta loja. No computador Windows do caixa, coloque-o na mesma pasta do arquivo <code class="font-mono bg-white/80 px-1 rounded">chave-leitura-ar.json</code> e dê duplo clique.
+          </p>
+          <button
+            @click="handleDownloadWindowsInstaller"
+            :disabled="!hasValidEdgeToken"
+            class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-black shadow-sm transition-colors"
+          >
+            <Download :size="15" />
+            <span>Baixar Instalador Windows (.bat)</span>
+          </button>
+        </div>
         <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
           <div class="flex items-center gap-2">
             <button
               @click="copyEnvSnippet"
               class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold hover:bg-slate-50"
             >
-              <Copy :size="14" />
-              <span>Copiar .env</span>
+              <Check v-if="copiedEnvFeedback" :size="14" class="text-emerald-600" />
+              <Copy v-else :size="14" />
+              <span>{{ copiedEnvFeedback ? "Copiado!" : "Copiar .env" }}</span>
             </button>
             <button
               @click="handleRegenerateToken"
