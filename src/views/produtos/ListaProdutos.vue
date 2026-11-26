@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import {
   Plus,
@@ -7,16 +7,18 @@ import {
   Edit2,
   Trash2,
   ShoppingBag,
-  Layers,
-  BarChart3,
   Copy,
   PauseCircle,
   PlayCircle,
+  BookOpen,
+  Store as StoreIcon,
+  Globe,
 } from "lucide-vue-next";
 import BaseButton from "@/components/BaseButton.vue";
 import categoryService from "@/services/categoryService";
 import { modifierGroupService } from "@/services/modifierGroupService";
 import { productService } from "@/services/productService";
+import { authState } from "@/utils/auth";
 
 const router = useRouter();
 const searchQuery = ref("");
@@ -40,13 +42,30 @@ const categorySettings = ref({
 });
 const savingCategory = ref(false);
 
+// Modal de Disponibilidade (Pausa Local vs. Global + iFood)
+const showAvailabilityModal = ref(false);
+const availabilityTarget = ref(null);
+const availabilityNextStatus = ref("UNAVAILABLE");
+const availabilityScope = ref("STORE_ONLY");
+const savingAvailability = ref(false);
+
+const activeStoreId = computed(() => authState.currentUser?.storeId || "");
+const activeStore = computed(() =>
+  (authState.accessibleStores || []).find((s) => s.id === activeStoreId.value) || null,
+);
+const sharedCatalogStores = computed(() => {
+  const catalogId = activeStore.value?.catalogId;
+  if (!catalogId) return [];
+  return (authState.accessibleStores || []).filter((s) => s.catalogId === catalogId);
+});
+
 const loadProducts = async () => {
   try {
     const response = await productService.getAll(
       selectedCategoryId.value,
       currentPage.value,
       20,
-      pendingCostFilter.value
+      pendingCostFilter.value,
     );
     products.value = response.content || [];
     currentPage.value = response.page || 0;
@@ -58,6 +77,23 @@ const loadProducts = async () => {
   }
 };
 
+const loadAll = async () => {
+  try {
+    await loadProducts();
+    availableCategories.value = await categoryService.getCategories();
+    modifierGroups.value = await modifierGroupService.getAll();
+  } catch (err) {
+    console.error("Erro ao carregar categorias ou produtos", err);
+  }
+};
+
+watch(activeStoreId, async (newId, oldId) => {
+  if (newId && newId !== oldId) {
+    currentPage.value = 0;
+    await loadAll();
+  }
+});
+
 const changePage = async (pageIndex) => {
   if (pageIndex >= 0 && pageIndex < totalPages.value) {
     currentPage.value = pageIndex;
@@ -66,13 +102,10 @@ const changePage = async (pageIndex) => {
 };
 
 onMounted(async () => {
-  try {
-    await loadProducts();
-    availableCategories.value = await categoryService.getCategories();
-    modifierGroups.value = await modifierGroupService.getAll();
-  } catch (err) {
-    console.error("Erro ao carregar categorias ou produtos", err);
+  if (!authState.accessibleStores || authState.accessibleStores.length === 0) {
+    await authState.refreshAccessibleStores();
   }
+  await loadAll();
 });
 
 const openCategorySettings = () => {
@@ -105,7 +138,6 @@ const applyCategorySettings = async () => {
       defaultModifierGroupIds: categorySettings.value.defaultModifierGroupIds,
     });
 
-    // update in list
     const index = availableCategories.value.findIndex(
       (c) => c.id === categorySettings.value.id,
     );
@@ -116,7 +148,7 @@ const applyCategorySettings = async () => {
     }
 
     showCategorySettings.value = false;
-  } catch (err) {
+  } catch {
     alert("Erro ao salvar categoria");
   } finally {
     savingCategory.value = false;
@@ -132,15 +164,13 @@ const applyModifiersToAllProducts = async () => {
     return;
   savingCategory.value = true;
   try {
-    // We'll call the new bulk apply endpoint
     await categoryService.bulkApplyModifiers(categorySettings.value.id);
     alert(
       "Modificadores aplicados com sucesso a todos os produtos da categoria!",
     );
     showCategorySettings.value = false;
-    // Refresh products
     await loadProducts();
-  } catch (err) {
+  } catch {
     alert("Erro ao aplicar modificadores em lote");
   } finally {
     savingCategory.value = false;
@@ -158,7 +188,11 @@ const filteredProducts = computed(() => {
 });
 
 const removeProduct = async (id) => {
-  if (confirm("Tem certeza que deseja excluir este produto?")) {
+  const warningMsg =
+    sharedCatalogStores.value.length > 1
+      ? "Este produto faz parte do cardápio compartilhado e será removido de todas as unidades vinculadas e pausado no iFood. Deseja continuar?"
+      : "Tem certeza que deseja excluir este produto?";
+  if (confirm(warningMsg)) {
     try {
       await productService.delete(id);
       products.value = products.value.filter((item) => item.id !== id);
@@ -169,21 +203,50 @@ const removeProduct = async (id) => {
   }
 };
 
-const toggleProductStatus = async (item) => {
-  const isAvailable = item.status === 'AVAILABLE';
-  const newStatus = isAvailable ? 'UNAVAILABLE' : 'AVAILABLE';
+const openAvailabilityChoice = (item) => {
+  const isAvailable = item.status === "AVAILABLE";
+  availabilityTarget.value = item;
+  availabilityNextStatus.value = isAvailable ? "UNAVAILABLE" : "AVAILABLE";
+
+  // Se estava pausado globalmente e vamos reativar, sugere reativar globalmente
+  if (!isAvailable && item.globalStatus === "UNAVAILABLE") {
+    availabilityScope.value = "CATALOG_GLOBAL";
+  } else if (sharedCatalogStores.value.length > 1) {
+    availabilityScope.value = "STORE_ONLY";
+  } else {
+    availabilityScope.value = "CATALOG_GLOBAL";
+  }
+  showAvailabilityModal.value = true;
+};
+
+const confirmAvailabilityChange = async () => {
+  if (!availabilityTarget.value) return;
+  savingAvailability.value = true;
   try {
-    await productService.updateAvailability(item.id, {
+    const item = availabilityTarget.value;
+    const newStatus = availabilityNextStatus.value;
+    const updated = await productService.updateAvailability(item.id, {
       status: newStatus,
-      availableDigitalMenu: newStatus === 'AVAILABLE',
-      availablePdv: newStatus === 'AVAILABLE'
+      scope: availabilityScope.value,
+      availableDigitalMenu: newStatus === "AVAILABLE",
+      availablePdv: newStatus === "AVAILABLE",
     });
-    item.status = newStatus;
-    item.availableDigitalMenu = newStatus === 'AVAILABLE';
-    item.availablePdv = newStatus === 'AVAILABLE';
+
+    item.status = updated?.status || newStatus;
+    item.globalStatus =
+      updated?.globalStatus ||
+      (availabilityScope.value === "CATALOG_GLOBAL" ? newStatus : item.globalStatus);
+    item.localStatus =
+      updated?.localStatus ||
+      (availabilityScope.value === "STORE_ONLY" ? newStatus : item.localStatus);
+    item.availableDigitalMenu = updated?.availableDigitalMenu ?? newStatus === "AVAILABLE";
+    item.availablePdv = updated?.availablePdv ?? newStatus === "AVAILABLE";
+    showAvailabilityModal.value = false;
   } catch (err) {
     console.error("Erro ao alterar status do produto", err);
-    alert("Erro ao alterar status do produto.");
+    alert(err?.response?.data?.message || "Erro ao alterar disponibilidade do produto.");
+  } finally {
+    savingAvailability.value = false;
   }
 };
 </script>
@@ -198,7 +261,7 @@ const toggleProductStatus = async (item) => {
           Produtos & Cardápio
         </h1>
         <p class="text-slate-500 text-sm font-medium">
-          Gestão de itens e fichas técnicas
+          Gestão de itens, preços por canal e fichas técnicas
         </p>
       </div>
 
@@ -206,6 +269,21 @@ const toggleProductStatus = async (item) => {
         <Plus :size="20" />
         Novo Produto
       </BaseButton>
+    </div>
+
+    <!-- Banner de Cardápio Compartilhado -->
+    <div
+      v-if="sharedCatalogStores.length > 1"
+      class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-violet-50 border border-violet-200 text-xs text-violet-900"
+    >
+      <div class="flex items-center gap-2.5">
+        <BookOpen :size="18" class="text-violet-600 shrink-0" />
+        <span>
+          <strong>{{ activeStore?.catalogName || "Cardápio Compartilhado" }}</strong> —
+          sincronizado entre <strong>{{ sharedCatalogStores.length }} unidades</strong>
+          ({{ sharedCatalogStores.map((s) => s.name).join(", ") }}). Estoque e pausa local são independentes por loja.
+        </span>
+      </div>
     </div>
 
     <!-- Tabela Padronizada -->
@@ -254,9 +332,9 @@ const toggleProductStatus = async (item) => {
             <Edit2 :size="18" />
           </button>
           <label class="flex items-center gap-2 text-sm text-slate-600 ml-2 cursor-pointer font-medium hover:text-slate-900">
-            <input 
-              type="checkbox" 
-              v-model="pendingCostFilter" 
+            <input
+              type="checkbox"
+              v-model="pendingCostFilter"
               @change="currentPage = 0; loadProducts();"
               class="w-4 h-4 text-orange-500 rounded border-slate-300 focus:ring-orange-500"
             />
@@ -295,8 +373,17 @@ const toggleProductStatus = async (item) => {
                       :class="{ 'line-through text-slate-400': item.status === 'UNAVAILABLE' }"
                       >{{ item.name }}</span
                     >
-                    <span v-if="item.status === 'UNAVAILABLE'" class="text-[10px] font-bold text-red-500 uppercase tracking-wider">
-                      Pausado
+                    <span
+                      v-if="item.globalStatus === 'UNAVAILABLE'"
+                      class="text-[10px] font-bold text-red-600 uppercase tracking-wider"
+                    >
+                      Pausado em todas as lojas + iFood
+                    </span>
+                    <span
+                      v-else-if="item.status === 'UNAVAILABLE'"
+                      class="text-[10px] font-bold text-amber-600 uppercase tracking-wider"
+                    >
+                      Pausado só nesta unidade
                     </span>
                   </div>
                 </div>
@@ -331,7 +418,7 @@ const toggleProductStatus = async (item) => {
               <td class="px-6 py-4 text-right">
                 <div class="flex justify-end gap-2">
                   <button
-                    @click="toggleProductStatus(item)"
+                    @click="openAvailabilityChoice(item)"
                     class="p-2 rounded-lg transition-all"
                     :class="item.status === 'AVAILABLE' ? 'text-amber-500 hover:bg-amber-50' : 'text-emerald-500 hover:bg-emerald-50'"
                     :title="item.status === 'AVAILABLE' ? 'Pausar Produto' : 'Ativar Produto'"
@@ -407,6 +494,108 @@ const toggleProductStatus = async (item) => {
             "
           >
             Próxima
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Escopo de Pausa / Reativação -->
+    <div
+      v-if="showAvailabilityModal && availabilityTarget"
+      class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50"
+    >
+      <div class="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 space-y-4 shadow-2xl">
+        <div>
+          <span
+            class="text-xs font-black uppercase"
+            :class="availabilityNextStatus === 'UNAVAILABLE' ? 'text-amber-600' : 'text-emerald-600'"
+          >
+            {{ availabilityNextStatus === "UNAVAILABLE" ? "Pausar Produto" : "Reativar Produto" }}
+          </span>
+          <h3 class="text-lg font-black text-slate-900 mt-0.5">
+            {{ availabilityTarget.name }}
+          </h3>
+          <p class="text-xs text-slate-500 mt-1">
+            Escolha onde esta alteração de disponibilidade deve ser aplicada:
+          </p>
+        </div>
+
+        <div class="space-y-2.5 text-xs">
+          <label
+            :class="[
+              'flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all',
+              availabilityScope === 'STORE_ONLY'
+                ? 'border-orange-500 bg-orange-50/70'
+                : 'border-slate-200 hover:bg-slate-50',
+            ]"
+          >
+            <input
+              type="radio"
+              value="STORE_ONLY"
+              v-model="availabilityScope"
+              class="mt-0.5 accent-orange-500"
+            />
+            <div class="space-y-0.5">
+              <div class="flex items-center gap-1.5 font-black text-slate-900">
+                <StoreIcon :size="14" class="text-orange-600" />
+                <span>Apenas nesta unidade ({{ activeStore?.name || "Loja atual" }})</span>
+              </div>
+              <p class="text-[11px] text-slate-600">
+                Ideal quando acabou um insumo só no balcão. Mantém o item disponível nas outras lojas e no iFood.
+              </p>
+            </div>
+          </label>
+
+          <label
+            :class="[
+              'flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all',
+              availabilityScope === 'CATALOG_GLOBAL'
+                ? 'border-orange-500 bg-orange-50/70'
+                : 'border-slate-200 hover:bg-slate-50',
+            ]"
+          >
+            <input
+              type="radio"
+              value="CATALOG_GLOBAL"
+              v-model="availabilityScope"
+              class="mt-0.5 accent-orange-500"
+            />
+            <div class="space-y-0.5">
+              <div class="flex items-center gap-1.5 font-black text-slate-900">
+                <Globe :size="14" class="text-violet-600" />
+                <span>Em todas as unidades + iFood (Global)</span>
+              </div>
+              <p class="text-[11px] text-slate-600">
+                Atualiza o cardápio compartilhado inteiro e reflete automaticamente a disponibilidade no iFood.
+              </p>
+            </div>
+          </label>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <button
+            @click="showAvailabilityModal = false"
+            class="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
+          <button
+            @click="confirmAvailabilityChange"
+            :disabled="savingAvailability"
+            :class="[
+              'px-4 py-2 rounded-xl text-white text-xs font-bold transition-colors',
+              availabilityNextStatus === 'UNAVAILABLE'
+                ? 'bg-amber-600 hover:bg-amber-700'
+                : 'bg-emerald-600 hover:bg-emerald-700',
+            ]"
+          >
+            {{
+              savingAvailability
+                ? "Salvando..."
+                : availabilityNextStatus === "UNAVAILABLE"
+                  ? "Confirmar Pausa"
+                  : "Confirmar Reativação"
+            }}
           </button>
         </div>
       </div>

@@ -16,6 +16,7 @@ import {
   Check,
   RefreshCw,
   KeyRound,
+  BookOpen,
 } from "lucide-vue-next";
 import { platformService } from "@/services/platformService";
 import { authState } from "@/utils/auth";
@@ -33,6 +34,8 @@ const showEditTenantModal = ref(false);
 const showAddStoreModal = ref(false);
 const showEditStoreModal = ref(false);
 const showEdgeTokenModal = ref(false);
+
+const tenantCatalogs = ref([]);
 
 const editTenantForm = ref({
   id: "",
@@ -54,6 +57,9 @@ const addStoreForm = ref({
   publicSlug: "",
   syncMode: "CLOUD",
   ownerLoginToLink: "",
+  catalogStrategy: "EXISTING", // EXISTING | NEW
+  catalogId: "",
+  newCatalogName: "",
 });
 
 const editStoreForm = ref({
@@ -68,6 +74,7 @@ const editStoreForm = ref({
 
 const edgeStoreInfo = ref({
   storeId: "",
+  catalogId: "",
   storeName: "",
   publicSlug: "",
   address: "",
@@ -124,6 +131,7 @@ const handleOnboarded = async (result) => {
   if (edgeStore) {
     openEdgeTokenModal(
       edgeStore.storeId,
+      edgeStore.catalogId || edgeStore.storeId,
       edgeStore.storeName,
       edgeStore.generatedEdgeDeviceToken,
       "",
@@ -169,7 +177,17 @@ const saveTenant = async () => {
   }
 };
 
-const openAddStore = (tenant) => {
+const openAddStore = async (tenant) => {
+  let catalogs = [];
+  try {
+    catalogs = await platformService.listTenantCatalogs(tenant.id);
+  } catch {
+    catalogs = [];
+  }
+  tenantCatalogs.value = Array.isArray(catalogs) ? catalogs : [];
+  const defaultCatalog =
+    tenantCatalogs.value.find((c) => c.defaultCatalog) || tenantCatalogs.value[0] || null;
+
   addStoreForm.value = {
     tenantId: tenant.id,
     tenantTradeName: tenant.tradeName,
@@ -179,6 +197,9 @@ const openAddStore = (tenant) => {
     publicSlug: "",
     syncMode: "CLOUD",
     ownerLoginToLink: tenant.ownerLogin || "",
+    catalogStrategy: "EXISTING",
+    catalogId: defaultCatalog ? defaultCatalog.id : "",
+    newCatalogName: "",
   };
   showAddStoreModal.value = true;
 };
@@ -187,19 +208,29 @@ const submitAddStore = async () => {
   loading.value = true;
   errorMsg.value = "";
   try {
-    const created = await platformService.addStoreToTenant(addStoreForm.value.tenantId, {
+    const payload = {
       name: addStoreForm.value.name,
       cnpj: addStoreForm.value.cnpj,
       address: addStoreForm.value.address,
       publicSlug: addStoreForm.value.publicSlug,
       syncMode: addStoreForm.value.syncMode,
       ownerLoginToLink: addStoreForm.value.ownerLoginToLink,
-    });
+      catalogId:
+        addStoreForm.value.catalogStrategy === "EXISTING" && addStoreForm.value.catalogId
+          ? addStoreForm.value.catalogId
+          : null,
+      newCatalogName:
+        addStoreForm.value.catalogStrategy === "NEW"
+          ? addStoreForm.value.newCatalogName
+          : null,
+    };
+    const created = await platformService.addStoreToTenant(addStoreForm.value.tenantId, payload);
     showAddStoreModal.value = false;
     await loadTenants();
     if (created.syncMode === "EDGE" && created.generatedEdgeDeviceToken) {
       openEdgeTokenModal(
         created.storeId,
+        created.catalogId || created.storeId,
         created.storeName,
         created.generatedEdgeDeviceToken,
         addStoreForm.value.publicSlug || "",
@@ -267,6 +298,7 @@ const visualizeStoreReadOnly = async (storeId) => {
 
 const openEdgeTokenModal = (
   storeId,
+  catalogId,
   storeName,
   token,
   publicSlug = "",
@@ -276,6 +308,7 @@ const openEdgeTokenModal = (
   copiedEnvFeedback.value = false;
   edgeStoreInfo.value = {
     storeId,
+    catalogId: catalogId || storeId,
     storeName,
     publicSlug: publicSlug || "",
     address: address || "",
@@ -298,6 +331,7 @@ const handleDownloadWindowsInstaller = () => {
   }
   downloadWindowsEdgeInstaller({
     storeId: edgeStoreInfo.value.storeId,
+    catalogId: edgeStoreInfo.value.catalogId || edgeStoreInfo.value.storeId,
     storeName: edgeStoreInfo.value.storeName,
     publicSlug: edgeStoreInfo.value.publicSlug,
     address: edgeStoreInfo.value.address,
@@ -319,6 +353,7 @@ const handleRegenerateToken = async () => {
 const copyEnvSnippet = async () => {
   const snippet = [
     `BEEBITE_EDGE_STORE_ID=${edgeStoreInfo.value.storeId}`,
+    `BEEBITE_EDGE_CATALOG_ID=${edgeStoreInfo.value.catalogId || edgeStoreInfo.value.storeId}`,
     `BEEBITE_EDGE_STORE_NAME=${edgeStoreInfo.value.storeName}`,
     edgeStoreInfo.value.publicSlug ? `BEEBITE_EDGE_STORE_SLUG=${edgeStoreInfo.value.publicSlug}` : null,
     `BEEBITE_EDGE_ADMIN_LOGIN=${edgeStoreInfo.value.ownerLogin || "admin"}`,
@@ -351,7 +386,7 @@ const copyEnvSnippet = async () => {
           Clientes Contratantes & Lojas (Multi-CNPJ)
         </h1>
         <p class="text-xs text-slate-500 mt-1">
-          Edite dados cadastrais, altere modos Cloud/Edge, gerencie tokens e acesse lojas em modo somente leitura.
+          Edite dados cadastrais, gerencie cardápios compartilhados, altere modos Cloud/Edge e gere instaladores.
         </p>
       </div>
 
@@ -460,7 +495,7 @@ const copyEnvSnippet = async () => {
             :key="store.id"
             class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between gap-3"
           >
-            <div class="space-y-1">
+            <div class="space-y-1.5">
               <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2">
                   <span class="font-bold text-sm text-slate-900">{{ store.name }}</span>
@@ -486,6 +521,14 @@ const copyEnvSnippet = async () => {
                   <HardDrive v-if="store.syncMode === 'EDGE'" :size="13" />
                   <Cloud v-else :size="13" />
                   {{ store.syncMode }}
+                </span>
+              </div>
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-violet-50 border border-violet-200 text-violet-700 text-[11px] font-bold"
+                >
+                  <BookOpen :size="12" />
+                  {{ store.catalogName || "Cardápio Principal" }}
                 </span>
               </div>
               <p class="text-xs text-slate-500">
@@ -531,7 +574,7 @@ const copyEnvSnippet = async () => {
 
               <button
                 v-if="store.syncMode === 'EDGE'"
-                @click="openEdgeTokenModal(store.id, store.name, store.edgeDeviceToken, store.publicSlug, store.address, tenant.ownerLogin)"
+                @click="openEdgeTokenModal(store.id, store.catalogId, store.name, store.edgeDeviceToken, store.publicSlug, store.address, tenant.ownerLogin)"
                 class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100"
               >
                 <KeyRound :size="13" />
@@ -595,7 +638,7 @@ const copyEnvSnippet = async () => {
       v-if="showAddStoreModal"
       class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50"
     >
-      <div class="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4 shadow-2xl">
+      <div class="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
             <span class="text-xs font-bold text-orange-600 uppercase">{{ addStoreForm.tenantTradeName }}</span>
@@ -606,7 +649,7 @@ const copyEnvSnippet = async () => {
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           <div class="sm:col-span-2">
             <label class="block text-slate-600 font-bold mb-1">Nome da Unidade *</label>
-            <input v-model="addStoreForm.name" placeholder="Ex: Chefs Burguer - Balcão" class="w-full px-3 py-2 rounded-lg border border-slate-200" />
+            <input v-model="addStoreForm.name" placeholder="Ex: Chefs Burguer - Delivery" class="w-full px-3 py-2 rounded-lg border border-slate-200" />
           </div>
           <div>
             <label class="block text-slate-600 font-bold mb-1">CNPJ da Unidade</label>
@@ -619,13 +662,69 @@ const copyEnvSnippet = async () => {
               <option value="EDGE">💻 EDGE (PDV Local Offline)</option>
             </select>
           </div>
+
+          <!-- Seletor de Cardápio Compartilhado vs Independente -->
+          <div class="sm:col-span-2 p-3 rounded-xl bg-violet-50/70 border border-violet-200 space-y-2.5">
+            <label class="block text-violet-900 font-black">
+              📒 Cardápio da Unidade (Fonte Única de Verdade)
+            </label>
+            <div class="flex flex-col gap-2">
+              <label class="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="EXISTING"
+                  v-model="addStoreForm.catalogStrategy"
+                  class="mt-0.5 accent-violet-600"
+                />
+                <span>
+                  <strong class="text-slate-900">Compartilhar Cardápio existente (Recomendado)</strong>
+                  <span class="block text-[11px] text-slate-600">
+                    Mesma marca: sincroniza categorias, produtos e preços automaticamente entre Balcão, Cloud e iFood, mantendo estoque local separado.
+                  </span>
+                </span>
+              </label>
+
+              <select
+                v-if="addStoreForm.catalogStrategy === 'EXISTING' && tenantCatalogs.length > 0"
+                v-model="addStoreForm.catalogId"
+                class="w-full px-3 py-2 rounded-lg bg-white border border-violet-200 font-semibold text-slate-800"
+              >
+                <option v-for="cat in tenantCatalogs" :key="cat.id" :value="cat.id">
+                  {{ cat.name }} ({{ cat.linkedStoresCount }} {{ cat.linkedStoresCount === 1 ? "loja" : "lojas" }})
+                </option>
+              </select>
+
+              <label class="flex items-start gap-2 cursor-pointer pt-1">
+                <input
+                  type="radio"
+                  value="NEW"
+                  v-model="addStoreForm.catalogStrategy"
+                  class="mt-0.5 accent-violet-600"
+                />
+                <span>
+                  <strong class="text-slate-900">Criar novo Cardápio independente</strong>
+                  <span class="block text-[11px] text-slate-600">
+                    Para outra marca ou dark kitchen com produtos e conta iFood separados.
+                  </span>
+                </span>
+              </label>
+
+              <input
+                v-if="addStoreForm.catalogStrategy === 'NEW'"
+                v-model="addStoreForm.newCatalogName"
+                placeholder="Ex: Cardápio Pizzaria da Casa"
+                class="w-full px-3 py-2 rounded-lg bg-white border border-violet-200"
+              />
+            </div>
+          </div>
+
           <div class="sm:col-span-2">
             <label class="block text-slate-600 font-bold mb-1">Endereço</label>
             <input v-model="addStoreForm.address" class="w-full px-3 py-2 rounded-lg border border-slate-200" />
           </div>
           <div>
             <label class="block text-slate-600 font-bold mb-1">Slug Público</label>
-            <input v-model="addStoreForm.publicSlug" placeholder="chefs-balcao" class="w-full px-3 py-2 rounded-lg border border-slate-200 font-mono" />
+            <input v-model="addStoreForm.publicSlug" placeholder="chefs-delivery" class="w-full px-3 py-2 rounded-lg border border-slate-200 font-mono" />
           </div>
           <div>
             <label class="block text-slate-600 font-bold mb-1">Login do Dono a Vincular</label>
@@ -696,6 +795,7 @@ const copyEnvSnippet = async () => {
         </div>
         <h3 class="text-base font-black text-slate-900">{{ edgeStoreInfo.storeName }}</h3>
         <pre class="p-4 rounded-xl bg-slate-900 text-sky-300 text-xs font-mono overflow-x-auto">BEEBITE_EDGE_STORE_ID={{ edgeStoreInfo.storeId }}
+BEEBITE_EDGE_CATALOG_ID={{ edgeStoreInfo.catalogId || edgeStoreInfo.storeId }}
 BEEBITE_EDGE_STORE_NAME={{ edgeStoreInfo.storeName }}
 BEEBITE_EDGE_ADMIN_LOGIN={{ edgeStoreInfo.ownerLogin || "admin" }}
 BEEBITE_SYNC_MODE=EDGE
@@ -704,7 +804,7 @@ EDGE_DEVICE_TOKEN={{ edgeStoreInfo.token }}</pre>
         <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-2">
           <div class="font-bold">⚡ Instalação 1-Clique no Windows do Cliente</div>
           <p class="text-[11px] leading-relaxed text-emerald-800">
-            Baixe o instalador já preenchido com o <strong>STORE_ID</strong> e o <strong>Token</strong> desta loja. No computador Windows do caixa, coloque-o na mesma pasta do arquivo <code class="font-mono bg-white/80 px-1 rounded">chave-leitura-ar.json</code> e dê duplo clique.
+            Baixe o instalador já preenchido com o <strong>STORE_ID</strong>, <strong>CATALOG_ID</strong> e o <strong>Token</strong> desta loja. No computador Windows do caixa, coloque-o na mesma pasta do arquivo <code class="font-mono bg-white/80 px-1 rounded">chave-leitura-ar.json</code> e dê duplo clique.
           </p>
           <button
             @click="handleDownloadWindowsInstaller"
@@ -750,4 +850,3 @@ EDGE_DEVICE_TOKEN={{ edgeStoreInfo.token }}</pre>
     />
   </div>
 </template>
-

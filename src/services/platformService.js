@@ -20,6 +20,10 @@ export const platformService = {
     const response = await api.post(`/platform/tenants/${tenantId}/stores`, payload);
     return response.data;
   },
+  listTenantCatalogs: async (tenantId) => {
+    const response = await api.get(`/platform/tenants/${tenantId}/catalogs`);
+    return response.data;
+  },
   updateStore: async (storeId, payload) => {
     const response = await api.put(`/platform/stores/${storeId}`, payload);
     return response.data;
