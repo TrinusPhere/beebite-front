@@ -287,6 +287,24 @@ const toggleStore = async () => {
       </section>
     </div>
 
+    <div class="bg-white border rounded-3xl p-6 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h2 class="font-black flex items-center gap-2 text-slate-900">
+          <HardDrive class="text-orange-500" :size="20" />
+          Sincronização Balcão (Edge) ↔ Nuvem
+        </h2>
+        <p class="text-xs text-slate-500 mt-1">
+          Acompanhe a fila local (Outbox), eventos rejeitados pela nuvem e execute a conferência periódica de integridade.
+        </p>
+      </div>
+      <router-link
+        to="/integracoes/edge-sync"
+        class="px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-sm transition-colors"
+      >
+        Abrir Diagnóstico Edge →
+      </router-link>
+    </div>
+
     <div class="bg-white border rounded-3xl p-6">
       <h2 class="font-black mb-3">Contrato de integração previsto</h2>
       <div class="grid md:grid-cols-4 gap-3 text-sm">

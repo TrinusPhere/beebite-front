@@ -22,9 +22,13 @@ import {
 import { authState } from "../utils/auth";
 import StoreSettingsModal from "../components/StoreSettingsModal.vue";
 import UserProfileModal from "../components/UserProfileModal.vue";
+import EdgeSyncStatusBadge from "../components/ui/EdgeSyncStatusBadge.vue";
+import { useEdgeSyncHealth } from "../composables/useEdgeSyncHealth";
 
 const router = useRouter();
 const route = useRoute();
+const { health: edgeSyncHealth, isEdgeMode: isLocalEdgeRuntime } =
+  useEdgeSyncHealth();
 const isMobileMenuOpen = ref(false);
 const isStoreSettingsOpen = ref(false);
 const isStoreSwitcherOpen = ref(false);
@@ -320,6 +324,9 @@ const handleLogout = () => {
         </div>
 
         <div class="flex items-center gap-2 md:gap-4">
+          <!-- Indicador em tempo real da Sincronização Edge -> Nuvem -->
+          <EdgeSyncStatusBadge v-if="!isPlatformContext" />
+
           <!-- Botão rápido Trinusphere Backoffice (apenas SUPER_ADMIN fora de /platform) -->
           <button
             v-if="isSuperAdminInsideStore"
@@ -368,8 +375,30 @@ const handleLogout = () => {
               <div class="px-4 py-3 text-xs text-slate-600 space-y-2">
                 <p class="flex items-center justify-between">
                   <span>API Nuvem:</span>
-                  <span class="font-bold text-emerald-600">● Online</span>
+                  <span
+                    v-if="isLocalEdgeRuntime && (edgeSyncHealth?.consecutiveFailures || 0) > 0"
+                    class="font-bold text-amber-600"
+                  >
+                    ● Aguardando reconexão
+                  </span>
+                  <span
+                    v-else-if="isLocalEdgeRuntime && (edgeSyncHealth?.failedCount || 0) > 0"
+                    class="font-bold text-red-600"
+                  >
+                    ● {{ edgeSyncHealth.failedCount }} rejeitado(s)
+                  </span>
+                  <span v-else class="font-bold text-emerald-600">● Online</span>
                 </p>
+                <button
+                  v-if="isLocalEdgeRuntime && authState.hasPermission('integracoes')"
+                  @click="
+                    closeAllDropdowns();
+                    router.push('/integracoes/edge-sync');
+                  "
+                  class="w-full py-1.5 rounded-lg bg-slate-100 text-slate-800 font-bold hover:bg-slate-200 transition-colors"
+                >
+                  Diagnóstico de Sincronização Edge →
+                </button>
                 <p v-if="activeStore" class="flex items-center justify-between">
                   <span>Unidade Ativa:</span>
                   <span class="font-bold text-slate-800 truncate max-w-[140px]">{{

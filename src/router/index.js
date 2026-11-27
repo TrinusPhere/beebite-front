@@ -20,6 +20,7 @@ import UsuariosView from "../views/usuarios/Usuarios.vue";
 import CadastroUsuario from "@/views/usuarios/CadastroUsuario.vue";
 import Integracoes from "../views/integracoes/Integracoes.vue";
 import IfoodCatalogSync from "../views/integracoes/IfoodCatalogSync.vue";
+import EdgeSyncDiagnosticsView from "../views/integracoes/EdgeSyncDiagnosticsView.vue";
 import CMV from "../views/financeiro/CMV.vue";
 import ConfiguracaoModificadores from "../views/configuracoes/ConfiguracaoModificadores.vue";
 import Checklist from "../views/operacional/Checklist.vue";
@@ -232,6 +233,12 @@ const router = createRouter({
           path: "integracoes/ifood-sync",
           name: "ifood-sync",
           component: IfoodCatalogSync,
+          meta: { requiresPermission: "integracoes" },
+        },
+        {
+          path: "integracoes/edge-sync",
+          name: "edge-sync-diagnostics",
+          component: EdgeSyncDiagnosticsView,
           meta: { requiresPermission: "integracoes" },
         },
         {
